@@ -1,0 +1,19 @@
+[
+  {
+    "text": "Go to Harry Shitters's house",
+    "trigger": {
+      "type": "location",
+      "x": 100,
+      "y": 64,
+      "z": 100,
+      "radius": 5
+    }
+  },
+  {
+    "text": "Go to Diagon Alley and purchase a wand",
+    "trigger": {
+      "type": "item",
+      "item": "minecraft:stick"
+    }
+  }
+]
