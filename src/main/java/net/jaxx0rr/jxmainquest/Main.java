@@ -1,8 +1,7 @@
-package net.jaxx0rr.jxmainquest; //3 change this
-
-//4 change grade.properties (mod_id, name, etc)
+package net.jaxx0rr.jxmainquest;
 
 import com.mojang.logging.LogUtils;
+import net.jaxx0rr.jxmainquest.network.StoryNetwork;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
@@ -15,22 +14,23 @@ import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.slf4j.Logger;
 
-// The value here should match an entry in the META-INF/mods.toml file
-@Mod(net.jaxx0rr.jxmainquest.JxMainQuest.MODID)
-//2 changethis (Shift-F6)
-public class JxMainQuest
+@Mod(Main.MODID)
+
+public class Main
 {
-    // Define mod id in a common place for everything to reference
-    public static final String MODID = "jxmainquest"; //1 changethis
-    // Directly reference a slf4j logger
+
+    public static final String MODID = "jxmainquest";
+
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    public JxMainQuest(FMLJavaModLoadingContext context)
+    public Main(FMLJavaModLoadingContext context)
     {
         IEventBus modEventBus = context.getModEventBus();
         modEventBus.addListener(this::commonSetup);
         MinecraftForge.EVENT_BUS.register(this);
         modEventBus.addListener(this::addCreative);
+
+        StoryNetwork.register(); // ✅ add this
     }
 
     private void commonSetup(final FMLCommonSetupEvent event)
