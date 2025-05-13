@@ -4,8 +4,9 @@ This guide provides detailed documentation and examples for using the `jxmainque
 Each quest stage has a `trigger` object, which determines when the player progresses to the next stage.
 
 *the json file you need to edit is located here:
-
+```
 config\jxmainquest\stages.json
+```
 
 ---
 
