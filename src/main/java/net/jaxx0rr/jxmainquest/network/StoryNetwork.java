@@ -1,7 +1,9 @@
 package net.jaxx0rr.jxmainquest.network;
 
+import com.google.gson.Gson;
 import net.jaxx0rr.jxmainquest.Main;
 import net.jaxx0rr.jxmainquest.story.StoryDialogueLine;
+import net.jaxx0rr.jxmainquest.story.StoryStage;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkDirection;
@@ -28,7 +30,9 @@ public class StoryNetwork {
         CHANNEL.registerMessage(id++, ReloadStagesPacket.class, ReloadStagesPacket::encode, ReloadStagesPacket::decode, ReloadStagesPacket::handle);
         CHANNEL.registerMessage(id++, OpenDialoguePacket.class, OpenDialoguePacket::encode, OpenDialoguePacket::decode, OpenDialoguePacket::handle);
         CHANNEL.registerMessage(id++, InteractionCompletePacket.class, InteractionCompletePacket::encode, InteractionCompletePacket::decode, InteractionCompletePacket::handle);
+        CHANNEL.registerMessage(id++, StageListSyncPacket.class, StageListSyncPacket::encode, StageListSyncPacket::decode, StageListSyncPacket::handle);
     }
+
 
     public static void sendStageToClient(ServerPlayer player, int stage) {
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new StageSyncPacket(stage));
@@ -44,6 +48,12 @@ public class StoryNetwork {
 
     public static void sendInteractionComplete(String npcName) {
         CHANNEL.sendToServer(new InteractionCompletePacket(npcName));
+    }
+
+    public static void sendStageListToClient(ServerPlayer player, List<StoryStage> stages) {
+        Gson gson = new Gson();
+        String json = gson.toJson(stages);
+        CHANNEL.sendTo(new StageListSyncPacket(json), player.connection.connection, NetworkDirection.PLAY_TO_CLIENT);
     }
 
 }

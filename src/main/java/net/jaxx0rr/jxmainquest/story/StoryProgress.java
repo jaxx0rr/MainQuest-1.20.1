@@ -40,6 +40,13 @@ public class StoryProgress implements INBTSerializable<CompoundTag> {
         if (mc.player == null) return;
 
         if (oldStage >= 0 && oldStage < StoryStageLoader.stages.size()) {
+            StoryStage prevStage = StoryStageLoader.stages.get(oldStage);
+
+            if ("waypoint".equals(prevStage.trigger.type)) {
+                mc.player.playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 0.8f, 1.5f); // or any other soft cue
+                return;
+            }
+
             String oldText = StoryStageLoader.stages.get(oldStage).text;
 
             if (newStage < StoryStageLoader.stages.size()) {

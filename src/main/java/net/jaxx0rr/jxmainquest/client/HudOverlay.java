@@ -2,11 +2,14 @@ package net.jaxx0rr.jxmainquest.client;
 
 import net.jaxx0rr.jxmainquest.story.StoryStage;
 import net.jaxx0rr.jxmainquest.story.StoryStageLoader;
+import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec2;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderGuiOverlayEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -36,8 +39,17 @@ public class HudOverlay {
         StoryStage stage = StoryStageLoader.stages.get(stageIndex);
         String text = stage.text;
 
-        if ("location".equals(stage.trigger.type)) {
+        if (stage.trigger != null && "location".equals(stage.trigger.type) || "waypoint".equals(stage.trigger.type) || "locationitem".equals(stage.trigger.type) || "interaction".equals(stage.trigger.type)) {
+
+            Vec3 worldPos = new Vec3(stage.trigger.x + 0.5, stage.trigger.y + 1.5, stage.trigger.z + 0.5);
+            Vec2 screenPos = projectToScreen(worldPos, event.getPartialTick());
+
+            if (screenPos != null) {
+                guiGraphics.drawString(font, "[ ]", (int)screenPos.x, (int)screenPos.y, 0xFFFFFF, true);
+            }
+
             BlockPos target = new BlockPos(stage.trigger.x, stage.trigger.y, stage.trigger.z);
+
 
             double dx = target.getX() + 0.5 - player.getX();
             double dz = target.getZ() + 0.5 - player.getZ();
@@ -105,4 +117,97 @@ public class HudOverlay {
         guiGraphics.pose().popPose();
 
     }
+
+
+    private static Vec2 projectToScreen_(Vec3 worldPos, float partialTicks) {
+        Minecraft mc = Minecraft.getInstance();
+        Camera camera = mc.gameRenderer.getMainCamera();
+
+        Vec3 camPos = camera.getPosition();
+        Vec3 rel = worldPos.subtract(camPos);
+
+        float yaw = camera.getYRot();
+        float pitch = camera.getXRot();
+
+        // ❌ Invert both yaw and pitch
+        rel = rel.yRot((float) Math.toRadians(-yaw));
+        rel = rel.xRot((float) Math.toRadians(pitch));
+
+        double z = rel.z;
+        if (z <= 0.1) return null;
+
+        double fov = mc.options.fov().get();
+        double scale = mc.getWindow().getGuiScaledHeight() / (2.0 * Math.tan(Math.toRadians(fov / 2)));
+
+        int width = mc.getWindow().getGuiScaledWidth();
+        int height = mc.getWindow().getGuiScaledHeight();
+
+        // ⬅ no inversion here; the rotation flips already handle it
+        double screenX = rel.x * scale / z + width / 2.0;
+        double screenY = -rel.y * scale / z + height / 2.0;
+
+        return new Vec2((float) screenX, (float) screenY);
+    }
+
+    private static Vec2 projectToScreen_2(Vec3 worldPos, float partialTicks) {
+        Minecraft mc = Minecraft.getInstance();
+        Camera camera = mc.gameRenderer.getMainCamera();
+
+        Vec3 camPos = camera.getPosition();
+        Vec3 rel = worldPos.subtract(camPos);
+
+        float yaw = camera.getYRot();
+        float pitch = camera.getXRot();
+
+        // ✅ Keep pitch inversion
+        rel = rel.yRot((float) Math.toRadians(-yaw));   // DO NOT change this
+        rel = rel.xRot((float) Math.toRadians(pitch));  // DO NOT change this
+
+        double z = rel.z;
+        if (z <= 0.1) return null;
+
+        double fov = mc.options.fov().get();
+        double scale = mc.getWindow().getGuiScaledHeight() / (2.0 * Math.tan(Math.toRadians(fov / 2)));
+
+        int width = mc.getWindow().getGuiScaledWidth();
+        int height = mc.getWindow().getGuiScaledHeight();
+
+        // ✅ Flip X only — fix side-to-side without affecting Y or camera
+        double screenX = -rel.x * scale / z + width / 2.0;
+        double screenY = -rel.y * scale / z + height / 2.0;
+
+        return new Vec2((float) screenX, (float) screenY);
+    }
+
+    private static Vec2 projectToScreen(Vec3 worldPos, float partialTicks) {
+        Minecraft mc = Minecraft.getInstance();
+        Camera camera = mc.gameRenderer.getMainCamera();
+
+        Vec3 camPos = camera.getPosition();
+        Vec3 rel = worldPos.subtract(camPos);
+
+        float yaw = camera.getYRot();
+        float pitch = camera.getXRot();
+
+        // ✅ Apply yaw and pitch consistently — both unflipped
+        rel = rel.yRot((float) Math.toRadians(yaw));
+        rel = rel.xRot((float) Math.toRadians(pitch));
+
+        double z = rel.z;
+        if (z <= 0.1) return null;
+
+        double fov = mc.options.fov().get();
+        double scale = mc.getWindow().getGuiScaledHeight() / (2.0 * Math.tan(Math.toRadians(fov / 2)));
+
+        int width = mc.getWindow().getGuiScaledWidth();
+        int height = mc.getWindow().getGuiScaledHeight();
+
+        double screenX = -rel.x * scale / z + width / 2.0;
+        double screenY = -rel.y * scale / z + height / 2.0;
+
+        return new Vec2((float) screenX, (float) screenY);
+    }
+
+
+
 }

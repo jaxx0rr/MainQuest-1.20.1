@@ -1,6 +1,6 @@
 [
   {
-    "text": "Go to Harry Shitters's house",
+    "text": "Go to Harry Potter's house",
     "trigger": {
       "type": "location",
       "x": 100,
