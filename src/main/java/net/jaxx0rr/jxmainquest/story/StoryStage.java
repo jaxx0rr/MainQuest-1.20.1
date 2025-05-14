@@ -36,5 +36,6 @@ public class StoryStage {
         public String anditem1, anditem2, anditem3, anditem4, anditem5, anditem6, anditem7, anditem8, anditem9;
         public String oritem1,  oritem2,  oritem3,  oritem4,  oritem5,  oritem6,  oritem7,  oritem8,  oritem9;
 
+        public String entity_type;
     }
 }

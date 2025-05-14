@@ -23,7 +23,8 @@ public class ClientDialogueManager {
         ClientDialogueManager.index = 0;
         ClientDialogueManager.active = true;
 
-        advanceDialogue(); // or whatever starts showing the first line
+        System.out.println("[Client] Starting dialogue with " + npcName + ", " + dialogueLines.size() + " lines");
+
     }
 
     public static void advanceDialogue() {
@@ -124,9 +125,7 @@ public class ClientDialogueManager {
 
     public static void end() {
         // ✅ Tell the server the dialogue is complete BEFORE clearing npcName
-        if (npcName != null) {
-            StoryNetwork.sendInteractionComplete(npcName);
-        }
+        StoryNetwork.sendInteractionComplete();
 
         active = false;
         lines = null;

@@ -1,16 +1,16 @@
 package net.jaxx0rr.jxmainquest.network;
 
 import net.jaxx0rr.jxmainquest.JxmqCommand;
-import net.jaxx0rr.jxmainquest.story.InteractionTracker;
+import net.jaxx0rr.jxmainquest.config.SpawnConfigLoader;
 import net.jaxx0rr.jxmainquest.story.StoryProgressProvider;
 import net.jaxx0rr.jxmainquest.story.StoryStage;
 import net.jaxx0rr.jxmainquest.story.StoryStageLoader;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ExperienceOrb;
-import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -30,8 +30,10 @@ import static net.jaxx0rr.jxmainquest.Main.MODID;
 public class ServerEvents {
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
-        StoryStageLoader.loadStages(); // initial load
+        StoryStageLoader.loadStages();
+        SpawnConfigLoader.load();
     }
+
 
     @SubscribeEvent
     public static void onRegisterCommands(RegisterCommandsEvent event) {
@@ -39,35 +41,15 @@ public class ServerEvents {
     }
 
     @SubscribeEvent
-    public static void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
-        if (!(event.getEntity() instanceof ServerPlayer player)) return;
-
-        Entity target = event.getTarget();
-        if (!target.hasCustomName()) return;
-
-        String name = target.getName().getString();
-
-        player.getCapability(StoryProgressProvider.STORY).ifPresent(progress -> {
-            int stage = progress.getCurrentStage();
-            if (stage >= StoryStageLoader.stages.size()) return;
-
-            StoryStage current = StoryStageLoader.stages.get(stage);
-            StoryStage.Trigger trigger = current.trigger;
-
-            if ("interaction".equals(trigger.type) && name.equals(trigger.npc_name)) {
-                if (trigger.dialogue != null && !trigger.dialogue.isEmpty()) {
-                    StoryNetwork.sendOpenDialogue(player, trigger.dialogue, name);
-                    event.setCanceled(true); // ✅ Prevent default (trade) GUI
-                }
-            }
-        });
+    public static void onEntityRightClick(PlayerInteractEvent.EntityInteractSpecific event) {
+        handleNpcInteraction(event.getEntity(), event.getTarget(), event);
     }
-
 
     @SubscribeEvent
     public static void onAttachCapabilities(AttachCapabilitiesEvent<Entity> event) {
         if (event.getObject() instanceof Player) {
-            event.addCapability(new ResourceLocation(MODID, "story_progress"), new StoryProgressProvider());
+            //event.addCapability(new ResourceLocation(MODID, "story_progress"), new StoryProgressProvider());
+            event.addCapability(ResourceLocation.fromNamespaceAndPath(MODID, "story_progress"), new StoryProgressProvider());
         }
     }
 
@@ -83,79 +65,33 @@ public class ServerEvents {
     @SubscribeEvent
     public static void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
-
-            // Sync current stage
             player.getCapability(StoryProgressProvider.STORY).ifPresent(progress -> {
                 StoryNetwork.sendStageListToClient(player, StoryStageLoader.stages);
                 StoryNetwork.sendStageToClient(player, progress.getCurrentStage());
-            });
 
+                if (progress.getCurrentStage() == 0) {
+                    ServerLevel level = player.server.getLevel(SpawnConfigLoader.getSpawnDimension());
+                    BlockPos pos = SpawnConfigLoader.getDefaultSpawn();
+                    if (level != null) {
+                        player.teleportTo(level, pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, player.getYRot(), player.getXRot());
+                        System.out.println("[jxmainquest] Teleported new player " + player.getName().getString() + " to custom spawn: " + pos);
+                    }
+                }
+            });
         }
     }
 
+
     @SubscribeEvent
-    public static void onEntityDeath(net.minecraftforge.event.entity.living.LivingDeathEvent event) {
-        if (!(event.getEntity() instanceof Villager villager)) return;
-        if (!villager.hasCustomName()) return;
-
-        String name = villager.getName().getString();
-        BlockPos pos = villager.blockPosition();
-
-        InteractionTracker.clearSpawned(name, pos);
+    public static void onEntityDeath(LivingDeathEvent event) {
     }
+
+
+
 
     @SubscribeEvent
     public static void onEnemyKilled(LivingDeathEvent event) {
-
-        /*
-        if (!(event.getSource().getEntity() instanceof ServerPlayer player)) return;
-
-        player.getCapability(StoryProgressProvider.STORY).ifPresent(progress -> {
-            int stageIndex = progress.getCurrentStage();
-            if (stageIndex >= StoryStageLoader.stages.size()) return;
-
-            StoryStage stage = StoryStageLoader.stages.get(stageIndex);
-            if (!"enemy".equals(stage.trigger.type)) return;
-
-            // Match entity type
-            Entity killed = event.getEntity();
-            ResourceLocation expectedType = ResourceLocation.tryParse(stage.trigger.enemy);
-            if (expectedType == null || !ForgeRegistries.ENTITY_TYPES.getKey(killed.getType()).equals(expectedType)) return;
-
-            // Optional: name match
-            if (stage.trigger.enemy_name != null && !stage.trigger.enemy_name.isEmpty()) {
-                if (!killed.hasCustomName() || !stage.trigger.enemy_name.equals(killed.getName().getString())) return;
-            }
-
-            // Optional: radius match
-            if (stage.trigger.enemy_radius > 0) {
-                BlockPos expected = new BlockPos(stage.trigger.x, stage.trigger.y, stage.trigger.z);
-                if (!killed.blockPosition().closerThan(expected, stage.trigger.enemy_radius)) return;
-            }
-
-            // ✅ It matches — advance and grant reward
-            progress.advanceStage();
-
-            if (stage.trigger.reward_item != null && !stage.trigger.reward_item.isEmpty()) {
-                ResourceLocation itemId = ResourceLocation.tryParse(stage.trigger.reward_item);
-                if (itemId != null && ForgeRegistries.ITEMS.containsKey(itemId)) {
-                    Item item = ForgeRegistries.ITEMS.getValue(itemId);
-                    int count = stage.trigger.reward_amount > 0 ? stage.trigger.reward_amount : 1;
-
-                    // 💡 DROP the item instead of adding it to inventory
-                    killed.spawnAtLocation(new ItemStack(item, count));
-                }
-            }
-
-
-            if (stage.trigger.reward_xp > 0) {
-                killed.level().addFreshEntity(new ExperienceOrb(killed.level(),
-                        killed.getX(), killed.getY(), killed.getZ(), stage.trigger.reward_xp));
-            }
-
-            StoryNetwork.sendStageToClient(player, progress.getCurrentStage());
-        });
-        */
+        if (!(event.getEntity().level() instanceof ServerLevel)) return;
 
         Entity killer = event.getSource().getEntity();
         ServerPlayer player = killer instanceof ServerPlayer ? (ServerPlayer) killer : null;
@@ -212,5 +148,30 @@ public class ServerEvents {
 
     }
 
+    private static void handleNpcInteraction(Entity source, Entity target, PlayerInteractEvent event) {
+        if (!(source instanceof ServerPlayer player)) return;
+        if (!target.hasCustomName()) return;
+
+        System.out.println("[jxmainquest] handleNpcInteraction: player=" + source.getName().getString() +
+                ", target=" + target.getName().getString());
+
+        String name = target.getName().getString();
+
+        player.getCapability(StoryProgressProvider.STORY).ifPresent(progress -> {
+            int stage = progress.getCurrentStage();
+            if (stage >= StoryStageLoader.stages.size()) return;
+
+            StoryStage current = StoryStageLoader.stages.get(stage);
+            StoryStage.Trigger trigger = current.trigger;
+
+            if ("interaction".equals(trigger.type) && name.equals(trigger.npc_name)) {
+                if (trigger.dialogue != null && !trigger.dialogue.isEmpty()) {
+                    System.out.println("[jxmainquest] Sending dialogue for stage interaction: " + name);
+                    StoryNetwork.sendOpenDialogue(player, trigger.dialogue, name);
+                    event.setCanceled(true); // ✅ Prevent default behavior (e.g. trading or taming)
+                }
+            }
+        });
+    }
 
 }

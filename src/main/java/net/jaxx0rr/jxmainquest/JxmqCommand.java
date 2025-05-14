@@ -2,7 +2,6 @@ package net.jaxx0rr.jxmainquest;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import net.jaxx0rr.jxmainquest.network.StoryNetwork;
 import net.jaxx0rr.jxmainquest.story.InteractionTracker;
 import net.jaxx0rr.jxmainquest.story.StoryProgressProvider;
@@ -10,9 +9,9 @@ import net.jaxx0rr.jxmainquest.story.StoryStage;
 import net.jaxx0rr.jxmainquest.story.StoryStageLoader;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.jaxx0rr.jxmainquest.tests.TriggerTestCommand;
 
 import java.util.UUID;
 
@@ -78,33 +77,34 @@ public class JxmqCommand {
                             UUID id = player.getUUID();
 
                             ctx.getSource().sendSystemMessage(Component.literal("§7[Debug] Interactions:"));
-                            InteractionTracker.getTalkedTo(id).forEach(name ->
-                                    ctx.getSource().sendSystemMessage(Component.literal("  §a" + name)));
-
-                            ctx.getSource().sendSystemMessage(Component.literal("§7[Debug] Spawned NPCs:"));
-                            InteractionTracker.getSpawned(id).forEach(key ->
-                                    ctx.getSource().sendSystemMessage(Component.literal("  §e" + key.name() + " @ " + key.pos().toShortString())));
+                            InteractionTracker.getTalkedTo(id).forEach(stageIndex ->
+                                    ctx.getSource().sendSystemMessage(Component.literal("  §aStage " + stageIndex)));
 
                             return 1;
                         }))
 
-                .then(Commands.literal("markunspawnednpc")
-                        .then(Commands.argument("name", StringArgumentType.string())
-                                .then(Commands.argument("x", IntegerArgumentType.integer())
-                                        .then(Commands.argument("y", IntegerArgumentType.integer())
-                                                .then(Commands.argument("z", IntegerArgumentType.integer())
-                                                        .executes(ctx -> {
-                                                            String name = StringArgumentType.getString(ctx, "name");
-                                                            int x = IntegerArgumentType.getInteger(ctx, "x");
-                                                            int y = IntegerArgumentType.getInteger(ctx, "y");
-                                                            int z = IntegerArgumentType.getInteger(ctx, "z");
+                .then(Commands.literal("dotests")
+                        .executes(ctx -> {
+                            ServerPlayer player = ctx.getSource().getPlayer();
+                            return TriggerTestCommand.runAllTests(player);
+                        })
+                )
 
-                                                            InteractionTracker.clearSpawned(name, new BlockPos(x, y, z));
+                .then(Commands.literal("unmark")
+                        .then(Commands.argument("stage", IntegerArgumentType.integer(0))
+                                .executes(ctx -> {
+                                    ServerPlayer player = ctx.getSource().getPlayer();
+                                    int stageIndex = IntegerArgumentType.getInteger(ctx, "stage");
 
-                                                            ctx.getSource().sendSuccess(() ->
-                                                                    Component.literal("Cleared spawn flag for '" + name + "' at " + x + "," + y + "," + z), false);
-                                                            return 1;
-                                                        }))))))
+                                    InteractionTracker.clearInteraction(player.getUUID(), stageIndex);
+
+                                    ctx.getSource().sendSuccess(() ->
+                                            Component.literal("Cleared interaction flag for stage " + stageIndex), false);
+                                    return 1;
+                                })
+                        )
+                )
+
 
                 // /jxmq stage ...
                 .then(Commands.literal("stage")
@@ -161,18 +161,17 @@ public class JxmqCommand {
                                             player.getCapability(StoryProgressProvider.STORY).ifPresent(progress -> {
                                                 progress.setStage(newStage[0]);
                                                 StoryNetwork.sendStageToClient(player, newStage[0]);
+                                                ModEventHandler.onStageStart(player, newStage[0]);
 
                                                 // Clear future interaction triggers
                                                 UUID playerId = player.getUUID();
                                                 for (int i = newStage[0] + 1; i < StoryStageLoader.stages.size(); i++) {
                                                     StoryStage stage = StoryStageLoader.stages.get(i);
                                                     if (stage.trigger != null && "interaction".equals(stage.trigger.type)) {
-                                                        String npcName = stage.trigger.npc_name;
-                                                        if (npcName != null && !npcName.isEmpty()) {
-                                                            InteractionTracker.clearInteraction(playerId, npcName);
-                                                        }
+                                                        InteractionTracker.clearInteraction(playerId, i);
                                                     }
                                                 }
+
                                             });
 
                                             ctx.getSource().sendSuccess(() ->
@@ -190,6 +189,7 @@ public class JxmqCommand {
                                         int newStage = progress.getCurrentStage() + 1;
                                         progress.setStage(newStage);
                                         StoryNetwork.sendStageToClient(player, newStage);
+                                        ModEventHandler.onStageStart(player, newStage);
                                     });
 
                                     ctx.getSource().sendSuccess(() ->
@@ -197,35 +197,24 @@ public class JxmqCommand {
                                     return 1;
                                 }))
 
-                        // /jxmq stage back
                         .then(Commands.literal("back")
                                 .executes(ctx -> {
                                     ServerPlayer player = ctx.getSource().getPlayer();
                                     player.getCapability(StoryProgressProvider.STORY).ifPresent(progress -> {
-                                        int newStage = Math.max(0, progress.getCurrentStage() - 1);
+                                        int oldStage = progress.getCurrentStage();
+                                        int newStage = Math.max(0, oldStage - 1);
                                         progress.setStage(newStage);
                                         StoryNetwork.sendStageToClient(player, newStage);
+                                        ModEventHandler.onStageStart(player, newStage);
 
-                                        // Clear future interaction triggers
-                                        UUID playerId = player.getUUID();
-//                                        for (int i = newStage + 1; i < StoryStageLoader.stages.size(); i++) {
-//                                            StoryStage stage = StoryStageLoader.stages.get(i);
-//                                            if (stage.trigger != null && "interaction".equals(stage.trigger.type)) {
-//                                                String npcName = stage.trigger.npc_name;
-//                                                if (npcName != null && !npcName.isEmpty()) {
-//                                                    InteractionTracker.clearInteraction(playerId, npcName);
-//                                                }
-//                                            }
-//                                        }
-                                        for (int i = newStage; i < StoryStageLoader.stages.size(); i++) {
-                                            StoryStage stage = StoryStageLoader.stages.get(i);
+                                        // ✅ Clear interaction/spawn for the new stage (not old one!)
+                                        if (newStage < StoryStageLoader.stages.size()) {
+                                            StoryStage stage = StoryStageLoader.stages.get(newStage);
                                             if (stage.trigger != null && "interaction".equals(stage.trigger.type)) {
-                                                String npcName = stage.trigger.npc_name;
-                                                if (npcName != null && !npcName.isEmpty()) {
-                                                    InteractionTracker.clearInteraction(playerId, npcName);
-                                                }
+                                                InteractionTracker.clearInteraction(player.getUUID(), newStage);
                                             }
                                         }
+
                                     });
 
                                     ctx.getSource().sendSuccess(() ->
@@ -233,13 +222,14 @@ public class JxmqCommand {
                                     return 1;
                                 }))
 
-                        // /jxmq stage reset
+                                // /jxmq stage reset
                         .then(Commands.literal("reset")
                                 .executes(ctx -> {
                                     ServerPlayer player = ctx.getSource().getPlayer();
                                     player.getCapability(StoryProgressProvider.STORY).ifPresent(progress -> {
                                         progress.setStage(0);
                                         StoryNetwork.sendStageToClient(player, 0);
+                                        ModEventHandler.onStageStart(player, 0);
                                         InteractionTracker.resetAllInteractions(player.getUUID());
                                     });
 

@@ -46,9 +46,10 @@ public class StoryNetwork {
         CHANNEL.sendTo(new OpenDialoguePacket(npcName, lines), player.connection.connection, NetworkDirection.PLAY_TO_CLIENT);
     }
 
-    public static void sendInteractionComplete(String npcName) {
-        CHANNEL.sendToServer(new InteractionCompletePacket(npcName));
+    public static void sendInteractionComplete() {
+        CHANNEL.sendToServer(new InteractionCompletePacket());
     }
+
 
     public static void sendStageListToClient(ServerPlayer player, List<StoryStage> stages) {
         Gson gson = new Gson();
