@@ -1,6 +1,7 @@
-package net.jaxx0rr.jxmainquest.story;
+package net.jaxx0rr.jxmainquest.config;
 
 import com.google.gson.Gson;
+import net.jaxx0rr.jxmainquest.story.StoryStage;
 import net.minecraftforge.fml.loading.FMLPaths;
 
 import java.io.IOException;
@@ -17,27 +18,42 @@ public class StoryStageLoader {
 
     public static void loadStages() {
         try {
-            // Get config directory (cross-platform safe)
             Path configPath = FMLPaths.CONFIGDIR.get().resolve("jxmainquest/stages.json");
 
-            // If it doesn't exist, copy a default version from resources (optional, see below)
             if (Files.notExists(configPath)) {
-                System.err.println("[jxmainquest] stages.json not found in config! Creating default...");
-                copyDefaultStagesTo(configPath); // optional step
+                System.err.println("[jxmainquest] stages.json not found in config! Skipping load.");
+                stages = new ArrayList<>();
+                return;
             }
 
-            System.out.println("Looking for stages.json at: " + configPath.toAbsolutePath());
-
-            // Load JSON from config file
             Reader reader = Files.newBufferedReader(configPath);
             Gson gson = new Gson();
             StoryStage[] loaded = gson.fromJson(reader, StoryStage[].class);
+
+            if (loaded == null || loaded.length == 0) {
+                System.err.println("[jxmainquest] ❌ Failed to load story json — file is empty or invalid.");
+                stages = new ArrayList<>();
+                return;
+            }
+
+            for (int i = 0; i < loaded.length; i++) {
+                StoryStage stage = loaded[i];
+                if (stage == null || stage.trigger == null) {
+                    System.err.println("[jxmainquest] ❌ Failed to load story json — malformed entry at index " + i);
+                    stages = new ArrayList<>();
+                    return;
+                }
+            }
+
             stages = Arrays.asList(loaded);
-            System.out.println("[jxmainquest] Loaded " + stages.size() + " story stages from config.");
+            System.out.println("[jxmainquest] ✅ Loaded " + stages.size() + " story stages.");
         } catch (Exception e) {
+            System.err.println("[jxmainquest] ❌ Failed to load story json — exception thrown.");
             e.printStackTrace();
+            stages = new ArrayList<>();
         }
     }
+
 
     public static int reloadStages() {
         loadStages();

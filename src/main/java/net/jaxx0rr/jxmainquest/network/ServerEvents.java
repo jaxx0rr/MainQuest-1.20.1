@@ -2,10 +2,11 @@ package net.jaxx0rr.jxmainquest.network;
 
 import net.jaxx0rr.jxmainquest.JxmqCommand;
 import net.jaxx0rr.jxmainquest.config.SpawnConfigLoader;
+import net.jaxx0rr.jxmainquest.config.StoryStageLoader;
 import net.jaxx0rr.jxmainquest.story.StoryProgressProvider;
 import net.jaxx0rr.jxmainquest.story.StoryStage;
-import net.jaxx0rr.jxmainquest.story.StoryStageLoader;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -14,6 +15,7 @@ import net.minecraft.world.entity.ExperienceOrb;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
@@ -70,14 +72,52 @@ public class ServerEvents {
                 StoryNetwork.sendStageToClient(player, progress.getCurrentStage());
 
                 if (progress.getCurrentStage() == 0) {
-                    ServerLevel level = player.server.getLevel(SpawnConfigLoader.getSpawnDimension());
-                    BlockPos pos = SpawnConfigLoader.getDefaultSpawn();
+                    ServerLevel level = player.server.getLevel(SpawnConfigLoader.getInitialDimension());
+                    BlockPos pos = SpawnConfigLoader.getInitialSpawn();
                     if (level != null) {
                         player.teleportTo(level, pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, player.getYRot(), player.getXRot());
                         System.out.println("[jxmainquest] Teleported new player " + player.getName().getString() + " to custom spawn: " + pos);
                     }
                 }
             });
+        }
+    }
+
+/*
+    @SubscribeEvent
+    public static void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player && !event.isEndConquered()) {
+            BlockPos pos = SpawnConfigLoader.getRespawnPoint();
+            if (pos != null) {
+                ServerLevel level = player.server.getLevel(SpawnConfigLoader.getRespawnDimension());
+                if (level != null) {
+                    player.teleportTo(level, pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5,
+                            player.getYRot(), player.getXRot());
+                    System.out.println("[jxmainquest] Teleported player to respawn_point: " + pos);
+                }
+            }
+        }
+    }
+*/
+
+    @SubscribeEvent
+    public static void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (event.isEndConquered()) return; // skip End respawns
+
+        // ✅ Only override if no valid bed
+        if (player.getRespawnPosition() == null) {
+            BlockPos pos = SpawnConfigLoader.getRespawnPoint();
+            ResourceKey<Level> dim = SpawnConfigLoader.getRespawnDimension();
+
+            if (pos != null) {
+                ServerLevel level = player.server.getLevel(dim);
+                if (level != null) {
+                    player.teleportTo(level, pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5,
+                            player.getYRot(), player.getXRot());
+                    System.out.println("[jxmainquest] Player had no bed, respawned at JSON-defined point: " + pos);
+                }
+            }
         }
     }
 
@@ -164,14 +204,22 @@ public class ServerEvents {
             StoryStage current = StoryStageLoader.stages.get(stage);
             StoryStage.Trigger trigger = current.trigger;
 
+            // 🟢 Match interaction type and NPC name
             if ("interaction".equals(trigger.type) && name.equals(trigger.npc_name)) {
+                // ✅ Cancel first — no matter what
+                event.setCanceled(true);
+
+                // 🟡 Only send dialogue if it exists
                 if (trigger.dialogue != null && !trigger.dialogue.isEmpty()) {
                     System.out.println("[jxmainquest] Sending dialogue for stage interaction: " + name);
                     StoryNetwork.sendOpenDialogue(player, trigger.dialogue, name);
-                    event.setCanceled(true); // ✅ Prevent default behavior (e.g. trading or taming)
+                } else {
+                    System.out.println("[jxmainquest] No dialogue found for NPC: " + name);
                 }
             }
         });
     }
+
+
 
 }

@@ -1,7 +1,6 @@
 package net.jaxx0rr.jxmainquest.config;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
@@ -10,78 +9,78 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.fml.loading.FMLPaths;
 
-import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 public class SpawnConfigLoader {
-    private static BlockPos defaultSpawn = new BlockPos(0, 64, 0);
-    private static ResourceKey<Level> spawnDimension = Level.OVERWORLD;
+    private static BlockPos initialSpawn = new BlockPos(0, 64, 0);
+    private static ResourceKey<Level> initialDimension = Level.OVERWORLD;
+
+    private static BlockPos respawnPoint = null;
+    private static ResourceKey<Level> respawnDimension = Level.OVERWORLD;
 
     public static void load() {
         try {
             Path configPath = FMLPaths.CONFIGDIR.get().resolve("jxmainquest/spawn_config.json");
 
             if (Files.notExists(configPath)) {
-                System.err.println("[jxmainquest] spawn_config.json not found! Creating default...");
-                copyDefaultSpawnTo(configPath);
+                System.out.println("[jxmainquest] spawn_config.json not found — skipping custom spawn setup.");
+                return;
             }
 
             Reader reader = Files.newBufferedReader(configPath);
-            Gson gson = new Gson();
-            JsonObject obj = gson.fromJson(reader, JsonObject.class);
+            JsonObject obj = new Gson().fromJson(reader, JsonObject.class);
 
-            int x = obj.has("x") ? obj.get("x").getAsInt() : 0;
-            int y = obj.has("y") ? obj.get("y").getAsInt() : 64;
-            int z = obj.has("z") ? obj.get("z").getAsInt() : 0;
-            defaultSpawn = new BlockPos(x, y, z);
-
-            if (obj.has("dimension")) {
-                String dimStr = obj.get("dimension").getAsString();
-                try {
-                    ResourceLocation dimId = ResourceLocation.tryParse(dimStr);
-                    if (dimId != null) {
-                        spawnDimension = ResourceKey.create(Registries.DIMENSION, dimId);
-                    }
-                } catch (Exception e) {
-                    System.err.println("[jxmainquest] Invalid dimension ID in spawn_config.json: " + dimStr);
+            // Load initial_spawn
+            if (obj.has("initial_spawn")) {
+                JsonObject init = obj.getAsJsonObject("initial_spawn");
+                initialSpawn = new BlockPos(
+                        init.get("x").getAsInt(),
+                        init.get("y").getAsInt(),
+                        init.get("z").getAsInt()
+                );
+                if (init.has("dimension")) {
+                    String dimStr = init.get("dimension").getAsString();
+                    initialDimension = ResourceKey.create(Registries.DIMENSION, new ResourceLocation(dimStr));
                 }
             }
 
-            System.out.println("[jxmainquest] Loaded default spawn: " + defaultSpawn + " in " + spawnDimension.location());
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private static void copyDefaultSpawnTo(Path path) {
-        try {
-            Files.createDirectories(path.getParent());
-
-            JsonObject obj = new JsonObject();
-            obj.addProperty("x", 0);
-            obj.addProperty("y", 64);
-            obj.addProperty("z", 0);
-            obj.addProperty("dimension", "minecraft:overworld");
-
-            Gson gson = new GsonBuilder().setPrettyPrinting().create();
-            try (OutputStreamWriter writer = new OutputStreamWriter(Files.newOutputStream(path))) {
-                gson.toJson(obj, writer);
+            // Load respawn_point (optional)
+            if (obj.has("respawn_point")) {
+                JsonObject respawn = obj.getAsJsonObject("respawn_point");
+                respawnPoint = new BlockPos(
+                        respawn.get("x").getAsInt(),
+                        respawn.get("y").getAsInt(),
+                        respawn.get("z").getAsInt()
+                );
+                if (respawn.has("dimension")) {
+                    String dimStr = respawn.get("dimension").getAsString();
+                    respawnDimension = ResourceKey.create(Registries.DIMENSION, new ResourceLocation(dimStr));
+                }
             }
 
-            System.out.println("[jxmainquest] Default spawn_config.json created.");
+            System.out.println("[jxmainquest] Loaded spawn_config.json with custom spawn settings.");
         } catch (Exception e) {
-            System.err.println("[jxmainquest] Failed to create default spawn_config.json");
             e.printStackTrace();
         }
     }
 
-    public static BlockPos getDefaultSpawn() {
-        return defaultSpawn;
+
+    public static BlockPos getInitialSpawn() {
+        return initialSpawn;
     }
 
-    public static ResourceKey<Level> getSpawnDimension() {
-        return spawnDimension;
+    public static ResourceKey<Level> getInitialDimension() {
+        return initialDimension;
     }
+
+    public static BlockPos getRespawnPoint() {
+        return respawnPoint;
+    }
+
+    public static ResourceKey<Level> getRespawnDimension() {
+        return respawnDimension;
+    }
+
 }

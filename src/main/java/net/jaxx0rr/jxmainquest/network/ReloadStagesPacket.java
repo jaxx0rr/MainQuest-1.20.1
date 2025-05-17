@@ -1,6 +1,6 @@
 package net.jaxx0rr.jxmainquest.network;
 
-import net.jaxx0rr.jxmainquest.story.StoryStageLoader;
+import net.jaxx0rr.jxmainquest.config.StoryStageLoader;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.network.NetworkEvent;
 
@@ -12,7 +12,7 @@ public class ReloadStagesPacket {
 
     public static void handle(ReloadStagesPacket msg, Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            StoryStageLoader.loadStages(); // ✅ re-load stages on client
+            StoryStageLoader.loadStages();
             System.out.println("[jxmainquest] Reloaded stages.json on client.");
         });
         ctx.get().setPacketHandled(true);

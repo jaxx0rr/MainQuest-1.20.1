@@ -1,7 +1,7 @@
 package net.jaxx0rr.jxmainquest.client;
 
 import net.jaxx0rr.jxmainquest.story.StoryStage;
-import net.jaxx0rr.jxmainquest.story.StoryStageLoader;
+import net.jaxx0rr.jxmainquest.config.StoryStageLoader;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;

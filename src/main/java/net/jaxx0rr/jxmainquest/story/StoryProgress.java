@@ -1,5 +1,6 @@
 package net.jaxx0rr.jxmainquest.story;
 
+import net.jaxx0rr.jxmainquest.config.StoryStageLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -7,9 +8,11 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraftforge.common.util.INBTSerializable;
 
 public class StoryProgress implements INBTSerializable<CompoundTag> {
-    public static int currentStage = 0;
+    private int currentStage = 0;
 
-    public int getCurrentStage() { return currentStage; }
+    public int getCurrentStage() {
+        return currentStage;
+    }
 
     public void setStage(int newStage) {
         if (newStage == currentStage) return;
@@ -17,6 +20,8 @@ public class StoryProgress implements INBTSerializable<CompoundTag> {
         int oldStage = currentStage;
         currentStage = newStage;
 
+        // Optional: put debug/log here
+        // System.out.println("[StoryProgress] Stage changed from " + oldStage + " to " + newStage);
     }
 
     public void advanceStage() {

@@ -11,7 +11,11 @@ import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.network.simple.SimpleChannel;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.zip.GZIPOutputStream;
 
 // StoryNetwork.java
 public class StoryNetwork {
@@ -50,11 +54,26 @@ public class StoryNetwork {
         CHANNEL.sendToServer(new InteractionCompletePacket());
     }
 
-
     public static void sendStageListToClient(ServerPlayer player, List<StoryStage> stages) {
         Gson gson = new Gson();
         String json = gson.toJson(stages);
-        CHANNEL.sendTo(new StageListSyncPacket(json), player.connection.connection, NetworkDirection.PLAY_TO_CLIENT);
+
+        try {
+            byte[] compressed = compress(json);
+            CHANNEL.sendTo(new StageListSyncPacket(compressed), player.connection.connection, NetworkDirection.PLAY_TO_CLIENT);
+        } catch (IOException e) {
+            System.err.println("[jxmainquest] ❌ Failed to compress stage list for sync.");
+            e.printStackTrace();
+        }
     }
+
+    public static byte[] compress(String str) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (GZIPOutputStream gzip = new GZIPOutputStream(baos)) {
+            gzip.write(str.getBytes(StandardCharsets.UTF_8));
+        }
+        return baos.toByteArray();
+    }
+
 
 }

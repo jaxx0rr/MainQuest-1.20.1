@@ -1,10 +1,11 @@
 package net.jaxx0rr.jxmainquest;
 
+import net.jaxx0rr.jxmainquest.config.StoryStageLoader;
 import net.jaxx0rr.jxmainquest.network.StoryNetwork;
 import net.jaxx0rr.jxmainquest.story.InteractionTracker;
 import net.jaxx0rr.jxmainquest.story.StoryProgressProvider;
 import net.jaxx0rr.jxmainquest.story.StoryStage;
-import net.jaxx0rr.jxmainquest.story.StoryStageLoader;
+import net.jaxx0rr.jxmainquest.util.SpawnRetryTracker;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -86,10 +87,17 @@ public class ModEventHandler {
                 // Reset interactions for upcoming stages
                 for (int i = newStage + 1; i < StoryStageLoader.stages.size(); i++) {
                     StoryStage stage = StoryStageLoader.stages.get(i);
+
+                    if (stage == null || stage.trigger == null) {
+                        System.out.println("[jxmainquest] Skipped null or malformed stage at index " + i);
+                        continue;
+                    }
+
                     if ("interaction".equals(stage.trigger.type)) {
                         InteractionTracker.clearInteraction(player.getUUID(), i);
                     }
                 }
+
 
                 StoryNetwork.sendStageToClient(serverPlayer, newStage);
             }
@@ -113,6 +121,7 @@ public class ModEventHandler {
             // Only spawn if chunk is loaded
             if (!player.level().hasChunkAt(target)) {
                 System.out.println("[jxmainquest] Chunk not loaded for stage " + stageIndex + ", skipping spawn for now.");
+                SpawnRetryTracker.mark(stageIndex, target);
                 return;
             }
 

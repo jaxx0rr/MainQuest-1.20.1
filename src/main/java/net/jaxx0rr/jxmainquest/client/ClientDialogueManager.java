@@ -22,7 +22,7 @@ public class ClientDialogueManager {
         ClientDialogueManager.lines = dialogueLines;
         ClientDialogueManager.index = 0;
         ClientDialogueManager.active = true;
-
+        ClientDialogueManager.waitingForChoice = false;
         System.out.println("[Client] Starting dialogue with " + npcName + ", " + dialogueLines.size() + " lines");
 
     }

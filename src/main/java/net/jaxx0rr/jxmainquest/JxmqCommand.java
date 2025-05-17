@@ -6,7 +6,7 @@ import net.jaxx0rr.jxmainquest.network.StoryNetwork;
 import net.jaxx0rr.jxmainquest.story.InteractionTracker;
 import net.jaxx0rr.jxmainquest.story.StoryProgressProvider;
 import net.jaxx0rr.jxmainquest.story.StoryStage;
-import net.jaxx0rr.jxmainquest.story.StoryStageLoader;
+import net.jaxx0rr.jxmainquest.config.StoryStageLoader;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -21,7 +21,7 @@ public class JxmqCommand {
         dispatcher.register(Commands.literal("jxmq")
                 .requires(source -> source.hasPermission(2))
 
-                // /jxmq reload
+                //jxmq reload
                 .then(Commands.literal("reload")
                         .executes(ctx -> {
                             int count = StoryStageLoader.reloadStages();
@@ -31,16 +31,33 @@ public class JxmqCommand {
                                 StoryNetwork.sendStageListToClient(online, StoryStageLoader.stages);
                             }
 
-                            /* //DONT DO THIS
-                            if (ctx.getSource().getEntity() instanceof ServerPlayer player) {
-                                StoryNetwork.sendReloadRequest(player);
-                            }
-                            */
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
 
-                            ctx.getSource().sendSuccess(() ->
-                                    Component.literal("[jxmainquest] Reloaded " + count + " stages."), true);
+                            if (count == 0) {
+                                ctx.getSource().sendSuccess(() ->
+                                        Component.literal("§cReloaded 0 stages — check stages.json for errors."), false);
+                            } else {
+                                ctx.getSource().sendSuccess(() ->
+                                        Component.literal("§aReloaded " + count + " stages."), false);
+
+                                // ✅ Re-apply current stage logic for the command sender
+                                player.getCapability(StoryProgressProvider.STORY).ifPresent(progress -> {
+                                    int stage = progress.getCurrentStage();
+                                    if (stage < StoryStageLoader.stages.size()) {
+                                        InteractionTracker.clearInteraction(player.getUUID(), stage);
+                                        ModEventHandler.onStageStart(player, stage);
+                                        StoryNetwork.sendStageToClient(player, stage);
+                                        player.sendSystemMessage(Component.literal("§7Re-applied current stage: §f" + stage));
+                                    } else {
+                                        player.sendSystemMessage(Component.literal("§cCurrent stage is invalid after reload."));
+                                    }
+                                });
+                            }
+
                             return 1;
-                        }))
+                        })
+                )
+
 
                 // /jxmq list
                 .then(Commands.literal("list")
