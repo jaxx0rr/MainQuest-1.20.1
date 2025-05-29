@@ -37,5 +37,8 @@ public class StoryStage {
         public String oritem1,  oritem2,  oritem3,  oritem4,  oritem5,  oritem6,  oritem7,  oritem8,  oritem9;
 
         public String entity_type;
+
+        public String set_time;
+        public String set_weather; // "clear", "rain", "thunder"
     }
 }

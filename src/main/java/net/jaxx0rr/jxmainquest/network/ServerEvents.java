@@ -5,6 +5,7 @@ import net.jaxx0rr.jxmainquest.config.SpawnConfigLoader;
 import net.jaxx0rr.jxmainquest.config.StoryStageLoader;
 import net.jaxx0rr.jxmainquest.story.StoryProgressProvider;
 import net.jaxx0rr.jxmainquest.story.StoryStage;
+import net.jaxx0rr.jxmainquest.util.EnemySpawnTracker;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
@@ -13,6 +14,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ExperienceOrb;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -25,6 +27,9 @@ import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.registries.ForgeRegistries;
+
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static net.jaxx0rr.jxmainquest.Main.MODID;
 
@@ -128,7 +133,8 @@ public class ServerEvents {
 
 
 
-
+/*
+    //progress works bottle not really
     @SubscribeEvent
     public static void onEnemyKilled(LivingDeathEvent event) {
         if (!(event.getEntity().level() instanceof ServerLevel)) return;
@@ -187,6 +193,242 @@ public class ServerEvents {
         }
 
     }
+*/
+
+/*
+    //bottle works progress not
+    @SubscribeEvent
+    public static void onEnemyKilled(LivingDeathEvent event) {
+        if (!(event.getEntity().level() instanceof ServerLevel level)) return;
+
+        Entity killer = event.getSource().getEntity();
+        ServerPlayer killerPlayer = killer instanceof ServerPlayer ? (ServerPlayer) killer : null;
+
+        AtomicReference<StoryStage.Trigger> matchedTrigger = new AtomicReference<>(null);
+
+        // Check if any player has a matching enemy stage — used to drop reward
+        for (ServerPlayer online : level.getServer().getPlayerList().getPlayers()) {
+            online.getCapability(StoryProgressProvider.STORY).ifPresent(progress -> {
+                int stageIndex = progress.getCurrentStage();
+                if (stageIndex >= StoryStageLoader.stages.size()) return;
+
+                StoryStage stage = StoryStageLoader.stages.get(stageIndex);
+                if (!"enemy".equals(stage.trigger.type)) return;
+
+                StoryStage.Trigger trigger = stage.trigger;
+
+                ResourceLocation expectedType = ResourceLocation.tryParse(trigger.enemy);
+                if (expectedType == null ||
+                        !ForgeRegistries.ENTITY_TYPES.getKey(event.getEntity().getType()).equals(expectedType)) return;
+
+                if (trigger.enemy_name != null &&
+                        !trigger.enemy_name.equals(event.getEntity().getName().getString())) return;
+
+                if (trigger.enemy_radius > 0) {
+                    BlockPos expected = new BlockPos(trigger.x, trigger.y, trigger.z);
+                    if (!event.getEntity().blockPosition().closerThan(expected, trigger.enemy_radius)) return;
+                }
+
+                matchedTrigger.set(trigger); // ✅ store it for reward drop
+            });
+        }
+
+        // Drop reward item and XP if applicable
+        StoryStage.Trigger trigger = matchedTrigger.get();
+        if (trigger != null) {
+            if (trigger.reward_item != null && !trigger.reward_item.isEmpty()) {
+                ResourceLocation itemId = ResourceLocation.tryParse(trigger.reward_item);
+                if (itemId != null && ForgeRegistries.ITEMS.containsKey(itemId)) {
+                    Item item = ForgeRegistries.ITEMS.getValue(itemId);
+                    int count = trigger.reward_amount > 0 ? trigger.reward_amount : 1;
+                    event.getEntity().spawnAtLocation(new ItemStack(item, count));
+                }
+            }
+
+            if (trigger.reward_xp > 0) {
+                level.addFreshEntity(new ExperienceOrb(
+                        level,
+                        event.getEntity().getX(),
+                        event.getEntity().getY(),
+                        event.getEntity().getZ(),
+                        trigger.reward_xp
+                ));
+            }
+        }
+
+        // Progress only the killer player, if their current stage matches
+        if (killerPlayer != null) {
+            killerPlayer.getCapability(StoryProgressProvider.STORY).ifPresent(progress -> {
+                int stageIndex = progress.getCurrentStage();
+                if (stageIndex >= StoryStageLoader.stages.size()) return;
+
+                StoryStage stage = StoryStageLoader.stages.get(stageIndex);
+                if (!"enemy".equals(stage.trigger.type)) return;
+
+                StoryStage.Trigger playerTrigger = stage.trigger;
+
+                ResourceLocation expectedType = ResourceLocation.tryParse(playerTrigger.enemy);
+                if (expectedType == null ||
+                        !ForgeRegistries.ENTITY_TYPES.getKey(event.getEntity().getType()).equals(expectedType)) return;
+
+                if (playerTrigger.enemy_name != null &&
+                        !playerTrigger.enemy_name.equals(event.getEntity().getName().getString())) return;
+
+                if (playerTrigger.enemy_radius > 0) {
+                    BlockPos expected = new BlockPos(playerTrigger.x, playerTrigger.y, playerTrigger.z);
+                    if (!event.getEntity().blockPosition().closerThan(expected, playerTrigger.enemy_radius)) return;
+                }
+
+                if (progress.hasKilledForStage(stageIndex)) return;
+
+                progress.markKillForStage(stageIndex);
+                progress.advanceStage();
+                StoryNetwork.sendStageToClient(killerPlayer, progress.getCurrentStage());
+            });
+        }
+    }
+*/
+
+    @SubscribeEvent
+    public static void onEnemyKilled(LivingDeathEvent event) {
+        if (!(event.getEntity().level() instanceof ServerLevel level)) return;
+
+        //Entity killer = event.getSource().getEntity();
+        //ServerPlayer killerPlayer = killer instanceof ServerPlayer ? (ServerPlayer) killer : null;
+
+        ServerPlayer killerPlayer = null;
+
+        Entity source = event.getSource().getEntity();
+        Entity direct = event.getSource().getDirectEntity();
+
+        if (source instanceof ServerPlayer p) {
+            killerPlayer = p;
+        } else if (direct instanceof ServerPlayer p) {
+            killerPlayer = p;
+        } else if (source instanceof Projectile proj && proj.getOwner() instanceof ServerPlayer p) {
+            killerPlayer = p;
+        }
+
+        // 🟡 Fallback: use SpawnTracker
+        if (killerPlayer == null) {
+            UUID ownerId = EnemySpawnTracker.getPlayerForMob(event.getEntity().getUUID());
+            if (ownerId != null) {
+                killerPlayer = level.getServer().getPlayerList().getPlayer(ownerId);
+                System.out.println("[jxmainquest] Using SpawnTracker: found owner " + ownerId);
+            }
+        }
+
+        AtomicReference<StoryStage.Trigger> matchedTrigger = new AtomicReference<>(null);
+
+        // Check if any player has a matching enemy stage — used to drop reward
+        for (ServerPlayer online : level.getServer().getPlayerList().getPlayers()) {
+            online.getCapability(StoryProgressProvider.STORY).ifPresent(progress -> {
+                int stageIndex = progress.getCurrentStage();
+                if (stageIndex >= StoryStageLoader.stages.size()) return;
+
+                StoryStage stage = StoryStageLoader.stages.get(stageIndex);
+                if (!"enemy".equals(stage.trigger.type)) return;
+
+                StoryStage.Trigger trigger = stage.trigger;
+
+                ResourceLocation expectedType = ResourceLocation.tryParse(trigger.enemy);
+                if (expectedType == null ||
+                        !ForgeRegistries.ENTITY_TYPES.getKey(event.getEntity().getType()).equals(expectedType)) return;
+
+                if (trigger.enemy_name != null &&
+                        !trigger.enemy_name.equals(event.getEntity().getName().getString())) return;
+
+                if (trigger.enemy_radius > 0) {
+                    BlockPos expected = new BlockPos(trigger.x, trigger.y, trigger.z);
+                    if (!event.getEntity().blockPosition().closerThan(expected, trigger.enemy_radius)) return;
+                }
+
+                matchedTrigger.set(trigger); // ✅ valid enemy, we can drop reward
+            });
+        }
+
+        // Drop reward for valid trigger
+        StoryStage.Trigger trigger = matchedTrigger.get();
+        if (trigger != null) {
+            if (trigger.reward_item != null && !trigger.reward_item.isEmpty()) {
+                ResourceLocation itemId = ResourceLocation.tryParse(trigger.reward_item);
+                if (itemId != null && ForgeRegistries.ITEMS.containsKey(itemId)) {
+                    Item item = ForgeRegistries.ITEMS.getValue(itemId);
+                    int count = trigger.reward_amount > 0 ? trigger.reward_amount : 1;
+                    event.getEntity().spawnAtLocation(new ItemStack(item, count));
+                    System.out.println("[jxmainquest] Dropped reward item: " + itemId);
+                }
+            }
+
+            if (trigger.reward_xp > 0) {
+                level.addFreshEntity(new ExperienceOrb(
+                        level,
+                        event.getEntity().getX(),
+                        event.getEntity().getY(),
+                        event.getEntity().getZ(),
+                        trigger.reward_xp
+                ));
+                System.out.println("[jxmainquest] Dropped XP: " + trigger.reward_xp);
+            }
+        }
+
+        // Progress only the killer if their stage matches
+        final ServerPlayer finalKillerPlayer = killerPlayer;
+        if (finalKillerPlayer != null) {
+            finalKillerPlayer.getCapability(StoryProgressProvider.STORY).ifPresent(progress -> {
+                int stageIndex = progress.getCurrentStage();
+                System.out.println("[jxmainquest] Killer " + finalKillerPlayer.getName().getString() + " is at stage " + stageIndex);
+
+                if (stageIndex >= StoryStageLoader.stages.size()) {
+                    System.out.println("[jxmainquest] Stage index out of bounds");
+                    return;
+                }
+
+                StoryStage stage = StoryStageLoader.stages.get(stageIndex);
+                if (!"enemy".equals(stage.trigger.type)) {
+                    System.out.println("[jxmainquest] Stage " + stageIndex + " is not enemy trigger");
+                    return;
+                }
+
+                StoryStage.Trigger playerTrigger = stage.trigger;
+
+                ResourceLocation expectedType = ResourceLocation.tryParse(playerTrigger.enemy);
+                ResourceLocation actualType = ForgeRegistries.ENTITY_TYPES.getKey(event.getEntity().getType());
+                if (expectedType == null || !actualType.equals(expectedType)) {
+                    System.out.println("[jxmainquest] Entity type mismatch: expected " + expectedType + ", got " + actualType);
+                    return;
+                }
+
+                if (playerTrigger.enemy_name != null &&
+                        !playerTrigger.enemy_name.equals(event.getEntity().getName().getString())) {
+                    System.out.println("[jxmainquest] Enemy name mismatch: expected " + playerTrigger.enemy_name + ", got " + event.getEntity().getName().getString());
+                    return;
+                }
+
+                if (playerTrigger.enemy_radius > 0) {
+                    BlockPos expected = new BlockPos(playerTrigger.x, playerTrigger.y, playerTrigger.z);
+                    double dist = event.getEntity().blockPosition().distSqr(expected);
+                    System.out.println("[jxmainquest] Distance squared from trigger center: " + dist);
+                    if (!event.getEntity().blockPosition().closerThan(expected, playerTrigger.enemy_radius)) {
+                        System.out.println("[jxmainquest] Entity is out of radius");
+                        return;
+                    }
+                }
+
+                if (progress.hasKilledForStage(stageIndex)) {
+                    System.out.println("[jxmainquest] Player already recorded a kill for this stage");
+                    return;
+                }
+
+                System.out.println("[jxmainquest] Advancing stage for player: " + finalKillerPlayer.getName().getString());
+                progress.markKillForStage(stageIndex);
+                progress.advanceStage();
+                StoryNetwork.sendStageToClient(finalKillerPlayer, progress.getCurrentStage());
+            });
+        }
+    }
+
+
 
     private static void handleNpcInteraction(Entity source, Entity target, PlayerInteractEvent event) {
         if (!(source instanceof ServerPlayer player)) return;

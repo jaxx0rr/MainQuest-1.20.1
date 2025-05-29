@@ -119,66 +119,6 @@ public class HudOverlay {
     }
 
 
-    private static Vec2 projectToScreen_(Vec3 worldPos, float partialTicks) {
-        Minecraft mc = Minecraft.getInstance();
-        Camera camera = mc.gameRenderer.getMainCamera();
-
-        Vec3 camPos = camera.getPosition();
-        Vec3 rel = worldPos.subtract(camPos);
-
-        float yaw = camera.getYRot();
-        float pitch = camera.getXRot();
-
-        // ❌ Invert both yaw and pitch
-        rel = rel.yRot((float) Math.toRadians(-yaw));
-        rel = rel.xRot((float) Math.toRadians(pitch));
-
-        double z = rel.z;
-        if (z <= 0.1) return null;
-
-        double fov = mc.options.fov().get();
-        double scale = mc.getWindow().getGuiScaledHeight() / (2.0 * Math.tan(Math.toRadians(fov / 2)));
-
-        int width = mc.getWindow().getGuiScaledWidth();
-        int height = mc.getWindow().getGuiScaledHeight();
-
-        // ⬅ no inversion here; the rotation flips already handle it
-        double screenX = rel.x * scale / z + width / 2.0;
-        double screenY = -rel.y * scale / z + height / 2.0;
-
-        return new Vec2((float) screenX, (float) screenY);
-    }
-
-    private static Vec2 projectToScreen_2(Vec3 worldPos, float partialTicks) {
-        Minecraft mc = Minecraft.getInstance();
-        Camera camera = mc.gameRenderer.getMainCamera();
-
-        Vec3 camPos = camera.getPosition();
-        Vec3 rel = worldPos.subtract(camPos);
-
-        float yaw = camera.getYRot();
-        float pitch = camera.getXRot();
-
-        // ✅ Keep pitch inversion
-        rel = rel.yRot((float) Math.toRadians(-yaw));   // DO NOT change this
-        rel = rel.xRot((float) Math.toRadians(pitch));  // DO NOT change this
-
-        double z = rel.z;
-        if (z <= 0.1) return null;
-
-        double fov = mc.options.fov().get();
-        double scale = mc.getWindow().getGuiScaledHeight() / (2.0 * Math.tan(Math.toRadians(fov / 2)));
-
-        int width = mc.getWindow().getGuiScaledWidth();
-        int height = mc.getWindow().getGuiScaledHeight();
-
-        // ✅ Flip X only — fix side-to-side without affecting Y or camera
-        double screenX = -rel.x * scale / z + width / 2.0;
-        double screenY = -rel.y * scale / z + height / 2.0;
-
-        return new Vec2((float) screenX, (float) screenY);
-    }
-
     private static Vec2 projectToScreen(Vec3 worldPos, float partialTicks) {
         Minecraft mc = Minecraft.getInstance();
         Camera camera = mc.gameRenderer.getMainCamera();

@@ -5,6 +5,7 @@ import net.jaxx0rr.jxmainquest.network.StoryNetwork;
 import net.jaxx0rr.jxmainquest.story.InteractionTracker;
 import net.jaxx0rr.jxmainquest.story.StoryProgressProvider;
 import net.jaxx0rr.jxmainquest.story.StoryStage;
+import net.jaxx0rr.jxmainquest.util.EnemySpawnTracker;
 import net.jaxx0rr.jxmainquest.util.SpawnRetryTracker;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -104,21 +105,70 @@ public class ModEventHandler {
         });
     }
 
+
     public static void onStageStart(ServerPlayer player, int stageIndex) {
         if (stageIndex >= StoryStageLoader.stages.size()) return;
 
         StoryStage stage = StoryStageLoader.stages.get(stageIndex);
         if (stage.trigger == null) return;
 
-        System.out.println("[jxmainquest] Stage start: " + stageIndex + " for " + player.getName().getString());
-
         StoryStage.Trigger trigger = stage.trigger;
+
+        if (trigger.set_time != null && player.level() instanceof ServerLevel serverLevel) {
+            long newTime = switch (trigger.set_time.toLowerCase()) {
+                case "day" -> 1000L;
+                case "noon" -> 6000L;
+                case "night" -> 13000L;
+                case "midnight" -> 18000L;
+                default -> -1L;
+            };
+
+            if (newTime >= 0) {
+                long currentDay = serverLevel.getDayTime() / 24000;
+                serverLevel.setDayTime(currentDay * 24000 + newTime);
+                System.out.println("[jxmainquest] Set time to '" + trigger.set_time + "' (" + newTime + ") for stage " + stageIndex);
+            } else {
+                System.out.println("[jxmainquest] Invalid set_time: " + trigger.set_time);
+            }
+        }
+
+        if (trigger.set_weather != null && player.level() instanceof ServerLevel serverLevel) {
+            switch (trigger.set_weather.toLowerCase()) {
+                case "clear" -> {
+                    serverLevel.setWeatherParameters(6000, 0, false, false);
+                    System.out.println("[jxmainquest] Set weather to CLEAR for stage " + stageIndex);
+                }
+                case "rain" -> {
+                    serverLevel.setWeatherParameters(0, 6000, true, false);
+                    System.out.println("[jxmainquest] Set weather to RAIN for stage " + stageIndex);
+                }
+                case "thunder", "storm" -> {
+                    serverLevel.setWeatherParameters(0, 6000, true, true);
+                    System.out.println("[jxmainquest] Set weather to THUNDER for stage " + stageIndex);
+                }
+                default -> {
+                    System.out.println("[jxmainquest] Invalid weather string: " + trigger.set_weather);
+                }
+            }
+        }
+
+        // ✅ Clear previous enemy tracking (for safety across stages)
+        EnemySpawnTracker.clearForPlayer(player.getUUID());
+
+        // ✅ Reset interaction or kill flags depending on stage type
+        if ("interaction".equals(trigger.type)) {
+            InteractionTracker.clearInteraction(player.getUUID(), stageIndex);
+        } else if ("enemy".equals(trigger.type)) {
+            player.getCapability(StoryProgressProvider.STORY).ifPresent(progress ->
+                    progress.resetKillForStage(stageIndex));
+        }
+
+        System.out.println("[jxmainquest] Stage start: " + stageIndex + " for " + player.getName().getString());
 
         if ("interaction".equals(trigger.type)) {
             BlockPos target = new BlockPos(trigger.x, trigger.y, trigger.z);
             String npcName = trigger.npc_name;
 
-            // Only spawn if chunk is loaded
             if (!player.level().hasChunkAt(target)) {
                 System.out.println("[jxmainquest] Chunk not loaded for stage " + stageIndex + ", skipping spawn for now.");
                 SpawnRetryTracker.mark(stageIndex, target);
@@ -126,7 +176,6 @@ public class ModEventHandler {
             }
 
             if (player.level() instanceof ServerLevel serverLevel) {
-                // 🧹 Always remove existing NPCs with this name at that exact block
                 player.level().getEntitiesOfClass(LivingEntity.class, new net.minecraft.world.phys.AABB(target))
                         .stream()
                         .filter(e -> e.getName().getString().equals(npcName))
@@ -135,7 +184,6 @@ public class ModEventHandler {
                             System.out.println("[jxmainquest] Removed NPC '" + npcName + "' at " + target);
                         });
 
-                // ✅ Spawn fresh NPC
                 spawnNamedEntity(serverLevel, target, npcName, trigger.dir, trigger.profession, trigger.entity_type);
                 System.out.println("[jxmainquest] Spawned NPC '" + npcName + "' at " + target + " for stage " + stageIndex);
             }
@@ -152,36 +200,18 @@ public class ModEventHandler {
                 String enemyType = trigger.enemy;
                 String enemyName = trigger.enemy_name;
                 double radius = trigger.enemy_radius > 0 ? trigger.enemy_radius : 10.0;
-/*
-                AABB zone = new AABB(
-                        target.getX() - radius, target.getY() - 5, target.getZ() - radius,
-                        target.getX() + radius, target.getY() + 5, target.getZ() + radius
-                );
 
-                List<LivingEntity> duplicates = player.level().getEntitiesOfClass(LivingEntity.class, zone)
-                        .stream()
-                        .filter(e ->
-                                e.isAlive() &&
-                                        ForgeRegistries.ENTITY_TYPES.getKey(e.getType()).toString().equals(enemyType) &&
-                                        (enemyName == null || enemyName.equals(e.getName().getString()))
-                        )
-                        .toList();
-
-                // Quietly discard duplicates without triggering death events
-                for (LivingEntity e : duplicates) {
-                    e.discard();
-                }
-*/
-                //System.out.println("[jxmainquest] Discarded " + duplicates.size() + " duplicate enemies at " + target + " for stage " + stageIndex);
-
-                // ✅ Spawn fresh enemy
                 if (player.level() instanceof ServerLevel serverLevel) {
-                    spawnEnemy(serverLevel, trigger);
-                    System.out.println("[jxmainquest] Spawned enemy '" + enemyName + "' at " + target + " for stage " + stageIndex);
+                    LivingEntity spawnedMob = spawnEnemy(serverLevel, trigger);
+                    if (spawnedMob != null && spawnedMob instanceof Mob) {
+                        EnemySpawnTracker.associateMobWithPlayer(spawnedMob, player);
+                        System.out.println("[jxmainquest] Spawned enemy '" + enemyName + "' at " + target + " for stage " + stageIndex);
+                    } else {
+                        System.out.println("[jxmainquest] [problem] Could not spawn enemy '" + enemyName + "' at " + target + " for stage " + stageIndex);
+                    }
                 }
             }
         }
-
     }
 
 
@@ -268,8 +298,6 @@ public class ModEventHandler {
         };
     }
 
-
-
     public static void spawnNamedEntity(ServerLevel level, BlockPos pos, String name, float yaw, @Nullable String professionId, @Nullable String entityTypeId) {
         // Default to villager if not specified
         ResourceLocation typeId = (entityTypeId != null && !entityTypeId.isEmpty())
@@ -336,51 +364,51 @@ public class ModEventHandler {
     }
 
 
-    public static void spawnEnemy(ServerLevel level, StoryStage.Trigger trigger) {
-        //LOGGER.info("[jxmainquest] Attempting to spawn enemy: " + trigger.enemy);
-
+    public static LivingEntity spawnEnemy(ServerLevel level, StoryStage.Trigger trigger) {
         ResourceLocation id = ResourceLocation.tryParse(trigger.enemy);
         if (id == null || !ForgeRegistries.ENTITY_TYPES.containsKey(id)) {
-            //LOGGER.error("[jxmainquest] Unknown enemy type: " + trigger.enemy);
-            return;
+            return null;
         }
 
         EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(id);
         if (type == null) {
-            //LOGGER.error("[jxmainquest] EntityType is null for " + id);
-            return;
+            return null;
         }
 
         LivingEntity entity = (LivingEntity) type.create(level);
         if (entity == null) {
-            //LOGGER.error("[jxmainquest] Could not create entity: " + id);
-            return;
+            return null;
         }
 
         BlockPos pos = new BlockPos(trigger.x, trigger.y, trigger.z);
-        entity.moveTo(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
+        //entity.moveTo(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
 
         if (trigger.enemy_name != null && !trigger.enemy_name.isEmpty()) {
             entity.setCustomName(Component.literal(trigger.enemy_name));
             entity.setCustomNameVisible(true);
         }
 
-        // ✅ Apply spawn behavior for mod entities
         if (entity instanceof Mob mob) {
             mob.finalizeSpawn(level, level.getCurrentDifficultyAt(pos), MobSpawnType.EVENT, null, null);
+            mob.moveTo(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, trigger.dir, 0.0f);
+            mob.setYRot(trigger.dir);
+            mob.setYHeadRot(trigger.dir);
+            mob.setYBodyRot(trigger.dir);
+            mob.yRotO = trigger.dir;
+            mob.yHeadRotO = trigger.dir;
         }
 
         level.addFreshEntity(entity);
-        //LOGGER.info("[jxmainquest] Spawned enemy: " + trigger.enemy + " at " + pos);
 
         // Optional debug message
         for (ServerPlayer p : level.players()) {
             if (p.gameMode.getGameModeForPlayer() == GameType.CREATIVE) {
                 p.sendSystemMessage(Component.literal("§7[Debug] §eSpawned enemy (" + trigger.enemy_name + ") at " +
-                        pos.getX() + ", " + pos.getY() + ", " + pos.getZ()));
+                        pos.getX() + ", " + pos.getY() + ", " + pos.getZ() + " dir:" + trigger.dir));
             }
         }
 
+        return entity;
     }
 
 
@@ -407,53 +435,6 @@ public class ModEventHandler {
         return list;
     }
 
-    /*
-    //WORKS !!!
-    private static boolean hasAllItems(Player player, List<String> itemDefs) {
-        for (String def : itemDefs) {
-            if (def == null || def.isEmpty()) continue;
-
-            String[] parts = def.split(":");
-            String id = parts.length >= 2 ? parts[0] + ":" + parts[1] : def;
-            int requiredCount = (parts.length == 3) ? Integer.parseInt(parts[2]) : 1;
-
-            int totalCount = player.getInventory().items.stream()
-                    .filter(stack -> !stack.isEmpty())
-                    .peek(stack -> System.out.println("   [CHECK] Item in slot: " + ForgeRegistries.ITEMS.getKey(stack.getItem())))
-                    .filter(stack -> ForgeRegistries.ITEMS.getKey(stack.getItem()).toString().equals(id))
-                    .mapToInt(ItemStack::getCount)
-                    .sum();
-
-            System.out.println("   [MATCH] Looking for: " + id + ", found: " + totalCount + " (need " + requiredCount + ")");
-            if (totalCount < requiredCount) return false;
-        }
-
-        return true;
-    }
-
-    //WORKS !!!
-    private static boolean hasOrItem(Player player, List<String> itemDefs) {
-        for (String def : itemDefs) {
-            if (def == null || def.isEmpty()) continue;
-
-            String[] parts = def.split(":");
-            String id = parts.length >= 2 ? parts[0] + ":" + parts[1] : def;
-            int requiredCount = (parts.length == 3) ? Integer.parseInt(parts[2]) : 1;
-
-            int totalCount = player.getInventory().items.stream()
-                    .filter(stack -> !stack.isEmpty())
-                    .peek(stack -> System.out.println("   [CHECK-OR] Item in slot: " + ForgeRegistries.ITEMS.getKey(stack.getItem())))
-                    .filter(stack -> ForgeRegistries.ITEMS.getKey(stack.getItem()).toString().equals(id))
-                    .mapToInt(ItemStack::getCount)
-                    .sum();
-
-            System.out.println("   [MATCH-OR] Looking for: " + id + ", found: " + totalCount + " (need " + requiredCount + ")");
-            if (totalCount >= requiredCount) return true;
-        }
-
-        return false;
-    }
-    */
 
     private static boolean hasAllItems(Player player, List<String> itemDefs) {
         for (String def : itemDefs) {

@@ -7,6 +7,9 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraftforge.common.util.INBTSerializable;
 
+import java.util.HashSet;
+import java.util.Set;
+
 public class StoryProgress implements INBTSerializable<CompoundTag> {
     private int currentStage = 0;
 
@@ -65,6 +68,20 @@ public class StoryProgress implements INBTSerializable<CompoundTag> {
 
             mc.player.playSound(SoundEvents.PLAYER_LEVELUP, 1.0f, 1.0f);
         }
+    }
+
+    private final Set<Integer> completedEnemyTriggers = new HashSet<>();
+
+    public boolean hasKilledForStage(int stageIndex) {
+        return completedEnemyTriggers.contains(stageIndex);
+    }
+
+    public void markKillForStage(int stageIndex) {
+        completedEnemyTriggers.add(stageIndex);
+    }
+
+    public void resetKillForStage(int stageIndex) {
+        completedEnemyTriggers.remove(stageIndex);
     }
 
 }
