@@ -2,31 +2,29 @@ package net.jaxx0rr.jxmainquest;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import net.jaxx0rr.jxmainquest.config.StoryStageLoader;
 import net.jaxx0rr.jxmainquest.network.StoryNetwork;
 import net.jaxx0rr.jxmainquest.story.InteractionTracker;
 import net.jaxx0rr.jxmainquest.story.StoryProgressProvider;
 import net.jaxx0rr.jxmainquest.story.StoryStage;
-import net.jaxx0rr.jxmainquest.config.StoryStageLoader;
-import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerPlayer;
 import net.jaxx0rr.jxmainquest.tests.TriggerTestCommand;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.network.chat.Component;
 
 import java.util.UUID;
+
+import static net.minecraft.commands.Commands.literal;
 
 public class JxmqCommand {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        dispatcher.register(Commands.literal("jxmq")
+        dispatcher.register(literal("jxmq")
                 .requires(source -> source.hasPermission(2))
 
-                //jxmq reload
-                .then(Commands.literal("reload")
+                .then(literal("reload")
                         .executes(ctx -> {
                             int count = StoryStageLoader.reloadStages();
-
-                            // Sync stage list to all players
                             for (ServerPlayer online : ctx.getSource().getServer().getPlayerList().getPlayers()) {
                                 StoryNetwork.sendStageListToClient(online, StoryStageLoader.stages);
                             }
@@ -40,7 +38,6 @@ public class JxmqCommand {
                                 ctx.getSource().sendSuccess(() ->
                                         Component.literal("§aReloaded " + count + " stages."), false);
 
-                                // ✅ Re-apply current stage logic for the command sender
                                 player.getCapability(StoryProgressProvider.STORY).ifPresent(progress -> {
                                     int stage = progress.getCurrentStage();
                                     if (stage < StoryStageLoader.stages.size()) {
@@ -53,23 +50,18 @@ public class JxmqCommand {
                                     }
                                 });
                             }
-
                             return 1;
                         })
                 )
 
-
-                // /jxmq list
-                .then(Commands.literal("list")
+                .then(literal("list")
                         .executes(ctx -> {
                             CommandSourceStack source = ctx.getSource();
                             int i = 1;
                             for (StoryStage stage : StoryStageLoader.stages) {
-
-                                if ("waypoint".equals(stage.trigger.type)) continue; // Skip
+                                if ("waypoint".equals(stage.trigger.type)) continue;
 
                                 StringBuilder msg = new StringBuilder("§a" + i + " - " + stage.text);
-
                                 if (stage.trigger != null) {
                                     switch (stage.trigger.type) {
                                         case "location" -> msg.append(" §7(Loc: ")
@@ -81,14 +73,13 @@ public class JxmqCommand {
                                         case "locationitem" -> msg.append(" §7(Loc+Item)");
                                     }
                                 }
-
                                 source.sendSuccess(() -> Component.literal(msg.toString()), false);
                                 i++;
                             }
                             return 1;
                         }))
 
-                .then(Commands.literal("debug")
+                .then(literal("debug")
                         .executes(ctx -> {
                             ServerPlayer player = ctx.getSource().getPlayer();
                             UUID id = player.getUUID();
@@ -100,21 +91,20 @@ public class JxmqCommand {
                             return 1;
                         }))
 
-                .then(Commands.literal("dotests")
+                .then(literal("dotests")
                         .executes(ctx -> {
                             ServerPlayer player = ctx.getSource().getPlayer();
                             return TriggerTestCommand.runAllTests(player);
                         })
                 )
 
-                .then(Commands.literal("unmark")
-                        .then(Commands.argument("stage", IntegerArgumentType.integer(0))
+                .then(literal("unmark")
+                        .then(net.minecraft.commands.Commands.argument("stage", IntegerArgumentType.integer(0))
                                 .executes(ctx -> {
                                     ServerPlayer player = ctx.getSource().getPlayer();
                                     int stageIndex = IntegerArgumentType.getInteger(ctx, "stage");
 
                                     InteractionTracker.clearInteraction(player.getUUID(), stageIndex);
-
                                     ctx.getSource().sendSuccess(() ->
                                             Component.literal("Cleared interaction flag for stage " + stageIndex), false);
                                     return 1;
@@ -122,19 +112,13 @@ public class JxmqCommand {
                         )
                 )
 
+                .then(literal("stage")
 
-                // /jxmq stage ...
-                .then(Commands.literal("stage")
-
-                        // ✅ NEW: /jxmq stage → show current stage
                         .executes(ctx -> {
                             ServerPlayer player = ctx.getSource().getPlayer();
                             player.getCapability(StoryProgressProvider.STORY).ifPresent(progress -> {
                                 int stage = progress.getCurrentStage();
-
                                 if (stage < StoryStageLoader.stages.size()) {
-                                    //String text = StoryStageLoader.stages.get(stage).text;
-
                                     int visibleStage = stage;
                                     for (int i = stage; i >= 0; i--) {
                                         if (!"waypoint".equals(StoryStageLoader.stages.get(i).trigger.type)) {
@@ -145,9 +129,6 @@ public class JxmqCommand {
                                     String text = StoryStageLoader.stages.get(visibleStage).text;
                                     player.sendSystemMessage(Component.literal("§e[MainQuest] Current Stage: §f" + visibleStage));
                                     player.sendSystemMessage(Component.literal("§7→ " + text));
-
-                                    //player.sendSystemMessage(Component.literal("§e[MainQuest] Current Stage: §f" + stage));
-                                    //player.sendSystemMessage(Component.literal("§7→ " + text));
                                 } else {
                                     player.sendSystemMessage(Component.literal("§aYou have completed all quests!"));
                                 }
@@ -155,14 +136,12 @@ public class JxmqCommand {
                             return 1;
                         })
 
-                        // /jxmq stage set <value>
-                        .then(Commands.literal("set")
-                                .then(Commands.argument("value", IntegerArgumentType.integer(0))
+                        .then(literal("set")
+                                .then(net.minecraft.commands.Commands.argument("value", IntegerArgumentType.integer(0))
                                         .executes(ctx -> {
                                             ServerPlayer player = ctx.getSource().getPlayer();
                                             int visibleStage = IntegerArgumentType.getInteger(ctx, "value");
 
-                                            // Convert visibleStage to internal stage index (skipping "waypoint" stages)
                                             final int[] newStage = {0};
                                             int count = -1;
                                             for (int i = 0; i < StoryStageLoader.stages.size(); i++) {
@@ -179,8 +158,6 @@ public class JxmqCommand {
                                                 progress.setStage(newStage[0]);
                                                 StoryNetwork.sendStageToClient(player, newStage[0]);
                                                 ModEventHandler.onStageStart(player, newStage[0]);
-
-                                                // Clear future interaction triggers
                                                 UUID playerId = player.getUUID();
                                                 for (int i = newStage[0] + 1; i < StoryStageLoader.stages.size(); i++) {
                                                     StoryStage stage = StoryStageLoader.stages.get(i);
@@ -188,7 +165,6 @@ public class JxmqCommand {
                                                         InteractionTracker.clearInteraction(playerId, i);
                                                     }
                                                 }
-
                                             });
 
                                             ctx.getSource().sendSuccess(() ->
@@ -198,8 +174,7 @@ public class JxmqCommand {
                                 )
                         )
 
-                        // /jxmq stage advance
-                        .then(Commands.literal("advance")
+                        .then(literal("advance")
                                 .executes(ctx -> {
                                     ServerPlayer player = ctx.getSource().getPlayer();
                                     player.getCapability(StoryProgressProvider.STORY).ifPresent(progress -> {
@@ -214,7 +189,7 @@ public class JxmqCommand {
                                     return 1;
                                 }))
 
-                        .then(Commands.literal("back")
+                        .then(literal("back")
                                 .executes(ctx -> {
                                     ServerPlayer player = ctx.getSource().getPlayer();
                                     player.getCapability(StoryProgressProvider.STORY).ifPresent(progress -> {
@@ -224,14 +199,12 @@ public class JxmqCommand {
                                         StoryNetwork.sendStageToClient(player, newStage);
                                         ModEventHandler.onStageStart(player, newStage);
 
-                                        // ✅ Clear interaction/spawn for the new stage (not old one!)
                                         if (newStage < StoryStageLoader.stages.size()) {
                                             StoryStage stage = StoryStageLoader.stages.get(newStage);
                                             if (stage.trigger != null && "interaction".equals(stage.trigger.type)) {
                                                 InteractionTracker.clearInteraction(player.getUUID(), newStage);
                                             }
                                         }
-
                                     });
 
                                     ctx.getSource().sendSuccess(() ->
@@ -239,8 +212,7 @@ public class JxmqCommand {
                                     return 1;
                                 }))
 
-                                // /jxmq stage reset
-                        .then(Commands.literal("reset")
+                        .then(literal("reset")
                                 .executes(ctx -> {
                                     ServerPlayer player = ctx.getSource().getPlayer();
                                     player.getCapability(StoryProgressProvider.STORY).ifPresent(progress -> {

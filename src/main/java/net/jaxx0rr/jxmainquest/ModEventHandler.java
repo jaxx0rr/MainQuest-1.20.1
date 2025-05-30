@@ -163,7 +163,7 @@ public class ModEventHandler {
                     progress.resetKillForStage(stageIndex));
         }
 
-        System.out.println("[jxmainquest] Stage start: " + stageIndex + " for " + player.getName().getString());
+        System.out.println("[jxmainquest] Stage start: " + stageIndex + "(" + stage.text + ") for " + player.getName().getString());
 
         if ("interaction".equals(trigger.type)) {
             BlockPos target = new BlockPos(trigger.x, trigger.y, trigger.z);
@@ -188,27 +188,26 @@ public class ModEventHandler {
                 System.out.println("[jxmainquest] Spawned NPC '" + npcName + "' at " + target + " for stage " + stageIndex);
             }
         }
+
         else if ("enemy".equals(trigger.type)) {
             BlockPos target = new BlockPos(trigger.x, trigger.y, trigger.z);
 
+            // 🛑 Delay if chunk is not loaded
             if (!player.level().hasChunkAt(target)) {
                 System.out.println("[jxmainquest] Chunk not loaded for enemy spawn at " + target + " (stage " + stageIndex + ")");
+                SpawnRetryTracker.mark(stageIndex, target); // ✅ Mark for retry
                 return;
             }
 
-            if (player.blockPosition().closerThan(target, 20.0)) {
-                String enemyType = trigger.enemy;
-                String enemyName = trigger.enemy_name;
-                double radius = trigger.enemy_radius > 0 ? trigger.enemy_radius : 10.0;
+            String enemyName = trigger.enemy_name;
 
-                if (player.level() instanceof ServerLevel serverLevel) {
-                    LivingEntity spawnedMob = spawnEnemy(serverLevel, trigger);
-                    if (spawnedMob != null && spawnedMob instanceof Mob) {
-                        EnemySpawnTracker.associateMobWithPlayer(spawnedMob, player);
-                        System.out.println("[jxmainquest] Spawned enemy '" + enemyName + "' at " + target + " for stage " + stageIndex);
-                    } else {
-                        System.out.println("[jxmainquest] [problem] Could not spawn enemy '" + enemyName + "' at " + target + " for stage " + stageIndex);
-                    }
+            if (player.level() instanceof ServerLevel serverLevel) {
+                LivingEntity spawnedMob = spawnEnemy(serverLevel, trigger);
+                if (spawnedMob instanceof Mob) {
+                    EnemySpawnTracker.associateMobWithPlayer(spawnedMob, player);
+                    System.out.println("[jxmainquest] Spawned enemy '" + enemyName + "' at " + target + " for stage " + stageIndex);
+                } else {
+                    System.out.println("[jxmainquest] [problem] Could not spawn enemy '" + enemyName + "' at " + target + " for stage " + stageIndex);
                 }
             }
         }
@@ -219,24 +218,6 @@ public class ModEventHandler {
         return switch (trigger.type) {
 
             case "enemy" -> {
-                BlockPos target = new BlockPos(trigger.x, trigger.y, trigger.z);
-
-                if (!player.blockPosition().closerThan(target, 20.0)) yield false;
-                if (trigger.spawn_enemy != null && !trigger.spawn_enemy) yield false;
-
-                double checkRadius = trigger.enemy_radius > 0 ? trigger.enemy_radius : 10.0;
-
-                boolean found = player.level().getEntitiesOfClass(LivingEntity.class,
-                                new net.minecraft.world.phys.AABB(
-                                        target.getX() - checkRadius, target.getY() - 5, target.getZ() - checkRadius,
-                                        target.getX() + checkRadius, target.getY() + 5, target.getZ() + checkRadius))
-                        .stream()
-                        .anyMatch(e ->
-                                e.isAlive() &&
-                                        ForgeRegistries.ENTITY_TYPES.getKey(e.getType()).toString().equals(trigger.enemy) &&
-                                        (trigger.enemy_name == null || trigger.enemy_name.equals(e.getName().getString()))
-                        );
-
                 yield false;
             }
 
@@ -364,53 +345,143 @@ public class ModEventHandler {
     }
 
 
+//    public static LivingEntity spawnEnemy(ServerLevel level, StoryStage.Trigger trigger) {
+//        ResourceLocation id = ResourceLocation.tryParse(trigger.enemy);
+//        if (id == null || !ForgeRegistries.ENTITY_TYPES.containsKey(id)) {
+//            return null;
+//        }
+//
+//        EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(id);
+//        if (type == null) {
+//            return null;
+//        }
+//
+//        LivingEntity entity = (LivingEntity) type.create(level);
+//        if (entity == null) {
+//            return null;
+//        }
+//
+//        BlockPos pos = new BlockPos(trigger.x, trigger.y, trigger.z);
+//        float yaw = trigger.dir;
+//
+//        // Name the mob if needed
+//        if (trigger.enemy_name != null && !trigger.enemy_name.isEmpty()) {
+//            entity.setCustomName(Component.literal(trigger.enemy_name));
+//            entity.setCustomNameVisible(true);
+//        }
+//
+//        // Finalize spawn (before moving)
+//        if (entity instanceof Mob mob) {
+//            mob.finalizeSpawn(level, level.getCurrentDifficultyAt(pos), MobSpawnType.EVENT, null, null);
+//        }
+//
+//        // Move with rotation
+//        entity.moveTo(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, yaw, 0.0f);
+//
+//        // Force full orientation
+//        entity.setYRot(yaw);
+//        entity.setYHeadRot(yaw);
+//        entity.setYBodyRot(yaw);
+//
+//        if (entity instanceof Mob mob) {
+//            mob.setYRot(yaw);
+//            mob.setYHeadRot(yaw);
+//            mob.setYBodyRot(yaw);
+//            mob.yRotO = yaw;
+//            mob.yHeadRotO = yaw;
+//        }
+//
+//        level.addFreshEntity(entity);
+//
+//        // Optional debug message
+//        for (ServerPlayer p : level.players()) {
+//            if (p.gameMode.getGameModeForPlayer() == GameType.CREATIVE) {
+//                p.sendSystemMessage(Component.literal("§7[Debug] §eSpawned enemy (" + trigger.enemy_name + ") at " +
+//                        pos.getX() + ", " + pos.getY() + ", " + pos.getZ() + " dir: " + yaw));
+//            }
+//        }
+//
+//        return entity;
+//    }
+
     public static LivingEntity spawnEnemy(ServerLevel level, StoryStage.Trigger trigger) {
-        ResourceLocation id = ResourceLocation.tryParse(trigger.enemy);
+        String[] parts = trigger.enemy.split(":");
+        if (parts.length < 2) return null;
+
+        String idString = parts[0] + ":" + parts[1];
+        int amount = 1;
+        if (parts.length == 3) {
+            try {
+                amount = Integer.parseInt(parts[2]);
+            } catch (NumberFormatException e) {
+                System.err.println("[jxmainquest] Invalid enemy amount: " + parts[2]);
+            }
+        }
+
+        ResourceLocation id = ResourceLocation.tryParse(idString);
         if (id == null || !ForgeRegistries.ENTITY_TYPES.containsKey(id)) {
+            System.err.println("[jxmainquest] Unknown enemy type: " + idString);
             return null;
         }
 
         EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(id);
-        if (type == null) {
-            return null;
-        }
-
-        LivingEntity entity = (LivingEntity) type.create(level);
-        if (entity == null) {
-            return null;
-        }
+        if (type == null) return null;
 
         BlockPos pos = new BlockPos(trigger.x, trigger.y, trigger.z);
-        //entity.moveTo(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
+        float yaw = trigger.dir;
 
-        if (trigger.enemy_name != null && !trigger.enemy_name.isEmpty()) {
-            entity.setCustomName(Component.literal(trigger.enemy_name));
-            entity.setCustomNameVisible(true);
-        }
+        LivingEntity firstEntity = null;
 
-        if (entity instanceof Mob mob) {
-            mob.finalizeSpawn(level, level.getCurrentDifficultyAt(pos), MobSpawnType.EVENT, null, null);
-            mob.moveTo(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, trigger.dir, 0.0f);
-            mob.setYRot(trigger.dir);
-            mob.setYHeadRot(trigger.dir);
-            mob.setYBodyRot(trigger.dir);
-            mob.yRotO = trigger.dir;
-            mob.yHeadRotO = trigger.dir;
-        }
+        for (int i = 0; i < amount; i++) {
+            LivingEntity entity = (LivingEntity) type.create(level);
+            if (entity == null) continue;
 
-        level.addFreshEntity(entity);
+            // Name the mob if needed
+            if (trigger.enemy_name != null && !trigger.enemy_name.isEmpty()) {
+                entity.setCustomName(Component.literal(trigger.enemy_name));
+                entity.setCustomNameVisible(true);
+            }
 
-        // Optional debug message
-        for (ServerPlayer p : level.players()) {
-            if (p.gameMode.getGameModeForPlayer() == GameType.CREATIVE) {
-                p.sendSystemMessage(Component.literal("§7[Debug] §eSpawned enemy (" + trigger.enemy_name + ") at " +
-                        pos.getX() + ", " + pos.getY() + ", " + pos.getZ() + " dir:" + trigger.dir));
+            // Finalize spawn (before moving)
+            if (entity instanceof Mob mob) {
+                mob.finalizeSpawn(level, level.getCurrentDifficultyAt(pos), MobSpawnType.EVENT, null, null);
+            }
+
+            // Slight offset to avoid perfect overlap
+            double offsetX = i * 0.4 * Math.cos(Math.toRadians(yaw));
+            double offsetZ = i * 0.4 * Math.sin(Math.toRadians(yaw));
+
+            entity.moveTo(pos.getX() + 0.5 + offsetX, pos.getY(), pos.getZ() + 0.5 + offsetZ, yaw, 0.0f);
+
+            // Force full orientation
+            entity.setYRot(yaw);
+            entity.setYHeadRot(yaw);
+            entity.setYBodyRot(yaw);
+            if (entity instanceof Mob mob) {
+                mob.setYRot(yaw);
+                mob.setYHeadRot(yaw);
+                mob.setYBodyRot(yaw);
+                mob.yRotO = yaw;
+                mob.yHeadRotO = yaw;
+            }
+
+            level.addFreshEntity(entity);
+
+            if (firstEntity == null) {
+                firstEntity = entity;
+            }
+
+            // Optional debug message
+            for (ServerPlayer p : level.players()) {
+                if (p.gameMode.getGameModeForPlayer() == GameType.CREATIVE) {
+                    p.sendSystemMessage(Component.literal("§7[Debug] §eSpawned enemy (" + trigger.enemy_name + ") at " +
+                            entity.blockPosition().getX() + ", " + entity.blockPosition().getY() + ", " + entity.blockPosition().getZ() + " dir: " + yaw));
+                }
             }
         }
 
-        return entity;
+        return firstEntity;
     }
-
 
 
     private static boolean nearPos(Player player, BlockPos pos, int radius) {
@@ -434,7 +505,6 @@ public class ModEventHandler {
         }
         return list;
     }
-
 
     private static boolean hasAllItems(Player player, List<String> itemDefs) {
         for (String def : itemDefs) {
@@ -464,7 +534,6 @@ public class ModEventHandler {
 
         return true;
     }
-
 
     private static boolean hasOrItem(Player player, List<String> itemDefs) {
         for (String def : itemDefs) {
