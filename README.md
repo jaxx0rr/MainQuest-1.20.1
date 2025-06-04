@@ -76,6 +76,37 @@ Advances when the player is within a given radius of a location.
 }
 ```
 
+optional stopwatch start parameter *start_timer* (can be used for racing)
+```json
+{
+  "text": "Fly through the first ring!",
+  "trigger": {
+    "type": "location",
+    "x": 561,
+    "y": 33,
+    "z": 917,
+    "radius": 3,
+    "start_timer": "quidditch_run"
+  }
+}
+```
+
+and at the last location use *stop_timer*
+
+```json
+{
+  "text": "Reach the finish ring!",
+  "trigger": {
+    "type": "location",
+    "x": 612,
+    "y": 42,
+    "z": 910,
+    "radius": 3,
+    "stop_timer": "quidditch_run"
+  }
+}
+```
+
 ---
 
 ### 2. `item`
@@ -323,3 +354,25 @@ Any trigger type can define rewards using:
   - 9 `anditemX`
   - 9 `oritemX` 
 
+
+an optional file is config\jxmainquest\spawn_config.json
+
+where you can define a default spawn dimention and location for new players like so
+```json
+{
+  "initial_spawn": {
+    "x": 501,
+    "y": -43,
+    "z": -126,
+    "dimension": "jx:london"
+  },
+  "respawn_point": {
+    "x": 326,
+    "y": 89,
+    "z": 299,
+    "dimension": "jx:hogwarts"
+  }
+}
+```
+
+for suggestions feel free to contact me on my discord (username: jaxx0rr)
