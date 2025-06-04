@@ -354,7 +354,6 @@ Any trigger type can define rewards using:
   - 9 `anditemX`
   - 9 `oritemX` 
 
-
 an optional file is config\jxmainquest\spawn_config.json
 
 where you can define a default spawn dimention and location for new players like so
