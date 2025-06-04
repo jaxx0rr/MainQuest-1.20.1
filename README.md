@@ -410,6 +410,8 @@ You can require the player to possess a specific item before progressing:
 
 If the player doesn't have enough of the item, the interaction is blocked and a warning is shown. When the stage progresses, the item is removed from their inventory.
 
+---
+
 
 
 for suggestions feel free to contact me on my discord (username: jaxx0rr)
