@@ -379,8 +379,33 @@ where you can define a default spawn dimention and location for new players like
 You can require the player to possess a specific item before progressing:
 
 ```json
-"remove_item": "minecraft:golden_horse_armor",
-"remove_amount": 1
+  {
+  "text": "Deliver the Golden Armor to the Knight",
+  "trigger": {
+    "type": "interaction",
+    "npc_name": "Knight Gregory",
+    "x": 336,
+    "y": 66,
+    "z": 3551,
+    "dir": 270,
+    "profession": "leatherworker",
+    "dialogue": [
+      { "npc": "Ah, the golden armor… beautiful, isn’t it?" },
+      { "npc": "My brother asked me to inspect it before it’s returned. Old ceremonial formality." },
+      { "npc": "You’ve done well, traveler. The spirit didn’t make it easy, I imagine." },
+      {
+        "player_choices": ["It was a tough fight.", "What’s so special about this armor anyway?"],
+        "npc_responses": [
+          "I’m sure. Few face the Hirschgeist and walk away with anything but hoofprints.",
+          "It’s enchanted — an heirloom meant for parades, not battle. But tradition matters here."
+        ]
+      },
+      { "npc": "Go on — my brother awaits your return." }
+    ],
+    "remove_item": "minecraft:golden_horse_armor",
+    "remove_amount": 1
+  }
+}
 ```
 
 If the player doesn't have enough of the item, the interaction is blocked and a warning is shown. When the stage progresses, the item is removed from their inventory.
