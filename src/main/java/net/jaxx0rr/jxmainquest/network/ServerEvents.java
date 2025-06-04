@@ -8,6 +8,7 @@ import net.jaxx0rr.jxmainquest.story.StoryProgressProvider;
 import net.jaxx0rr.jxmainquest.story.StoryStage;
 import net.jaxx0rr.jxmainquest.util.EnemySpawnTracker;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -300,6 +301,38 @@ public class ServerEvents {
         return parts.length >= 2 ? ResourceLocation.tryParse(parts[0] + ":" + parts[1]) : null;
     }
 
+//    private static void handleNpcInteraction(Entity source, Entity target, PlayerInteractEvent event) {
+//        if (!(source instanceof ServerPlayer player)) return;
+//        if (!target.hasCustomName()) return;
+//
+//        System.out.println("[jxmainquest] handleNpcInteraction: player=" + source.getName().getString() +
+//                ", target=" + target.getName().getString());
+//
+//        String name = target.getName().getString();
+//
+//        player.getCapability(StoryProgressProvider.STORY).ifPresent(progress -> {
+//            int stage = progress.getCurrentStage();
+//            if (stage >= StoryStageLoader.stages.size()) return;
+//
+//            StoryStage current = StoryStageLoader.stages.get(stage);
+//            StoryStage.Trigger trigger = current.trigger;
+//
+//            // 🟢 Match interaction type and NPC name
+//            if ("interaction".equals(trigger.type) && name.equals(trigger.npc_name)) {
+//                // ✅ Cancel first — no matter what
+//                event.setCanceled(true);
+//
+//                // 🟡 Only send dialogue if it exists
+//                if (trigger.dialogue != null && !trigger.dialogue.isEmpty()) {
+//                    System.out.println("[jxmainquest] Sending dialogue for stage interaction: " + name);
+//                    StoryNetwork.sendOpenDialogue(player, trigger.dialogue, name);
+//                } else {
+//                    System.out.println("[jxmainquest] No dialogue found for NPC: " + name);
+//                }
+//            }
+//        });
+//    }
+
     private static void handleNpcInteraction(Entity source, Entity target, PlayerInteractEvent event) {
         if (!(source instanceof ServerPlayer player)) return;
         if (!target.hasCustomName()) return;
@@ -321,6 +354,25 @@ public class ServerEvents {
                 // ✅ Cancel first — no matter what
                 event.setCanceled(true);
 
+                // 🔒 Check required item before allowing dialogue
+                if (trigger.remove_item != null && !trigger.remove_item.isEmpty()) {
+                    Item requiredItem = ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse(trigger.remove_item));
+                    int requiredCount = trigger.remove_amount > 0 ? trigger.remove_amount : 1;
+                    int found = 0;
+
+                    for (ItemStack stack : player.getInventory().items) {
+                        if (stack.getItem().equals(requiredItem)) {
+                            found += stack.getCount();
+                            if (found >= requiredCount) break;
+                        }
+                    }
+
+                    if (found < requiredCount) {
+                        player.displayClientMessage(Component.literal("§cMissing required item: " + requiredItem.getDescription().getString()), true);
+                        return; // ⛔ Don't proceed
+                    }
+                }
+
                 // 🟡 Only send dialogue if it exists
                 if (trigger.dialogue != null && !trigger.dialogue.isEmpty()) {
                     System.out.println("[jxmainquest] Sending dialogue for stage interaction: " + name);
@@ -331,7 +383,6 @@ public class ServerEvents {
             }
         });
     }
-
 
 
 }

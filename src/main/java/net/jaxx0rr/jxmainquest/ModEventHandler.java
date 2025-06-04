@@ -281,14 +281,53 @@ public class ModEventHandler {
             }
 
 
+//            case "interaction" -> {
+//                if (InteractionTracker.hasTalkedTo(player.getUUID(), stageIndex)) {
+//                    yield true;
+//                }
+//                yield false;
+//            }
+
             case "interaction" -> {
                 if (InteractionTracker.hasTalkedTo(player.getUUID(), stageIndex)) {
+
+                    if (trigger.remove_item != null && !trigger.remove_item.isEmpty()) {
+                        ResourceLocation itemId = ResourceLocation.tryParse(trigger.remove_item);
+                        int requiredAmount = Math.max(1, trigger.remove_amount);
+
+                        if (itemId != null && ForgeRegistries.ITEMS.containsKey(itemId)) {
+                            Item requiredItem = ForgeRegistries.ITEMS.getValue(itemId);
+                            int playerCount = player.getInventory().countItem(requiredItem);
+
+                            if (playerCount < requiredAmount) {
+                                InteractionTracker.clearInteraction(player.getUUID(), stageIndex);
+                                player.sendSystemMessage(Component.literal("§cMissing required item: " +
+                                        requiredItem.getDescription().getString()));
+                                yield false;
+                            }
+
+                            // ✅ Remove items manually
+                            int toRemove = requiredAmount;
+                            for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+                                ItemStack stack = player.getInventory().getItem(i);
+                                if (stack.getItem() == requiredItem) {
+                                    int removeCount = Math.min(toRemove, stack.getCount());
+                                    stack.shrink(removeCount);
+                                    toRemove -= removeCount;
+                                    if (toRemove <= 0) break;
+                                }
+                            }
+                        }
+                    }
+
                     yield true;
                 }
+
                 yield false;
             }
 
-            default -> false; // ✅ This fixes the error
+
+            default -> false;
         };
     }
 
@@ -356,86 +395,6 @@ public class ModEventHandler {
             }
         }
     }
-
-//
-//    public static LivingEntity spawnEnemy(ServerLevel level, StoryStage.Trigger trigger) {
-//        String[] parts = trigger.enemy.split(":");
-//        if (parts.length < 2) return null;
-//
-//        String idString = parts[0] + ":" + parts[1];
-//        int amount = 1;
-//        if (parts.length == 3) {
-//            try {
-//                amount = Integer.parseInt(parts[2]);
-//            } catch (NumberFormatException e) {
-//                System.err.println("[jxmainquest] Invalid enemy amount: " + parts[2]);
-//            }
-//        }
-//
-//        ResourceLocation id = ResourceLocation.tryParse(idString);
-//        if (id == null || !ForgeRegistries.ENTITY_TYPES.containsKey(id)) {
-//            System.err.println("[jxmainquest] Unknown enemy type: " + idString);
-//            return null;
-//        }
-//
-//        EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(id);
-//        if (type == null) return null;
-//
-//        BlockPos pos = new BlockPos(trigger.x, trigger.y, trigger.z);
-//        float yaw = trigger.dir;
-//
-//        LivingEntity firstEntity = null;
-//
-//        for (int i = 0; i < amount; i++) {
-//            LivingEntity entity = (LivingEntity) type.create(level);
-//            if (entity == null) continue;
-//
-//            // Name the mob if needed
-//            if (trigger.enemy_name != null && !trigger.enemy_name.isEmpty()) {
-//                entity.setCustomName(Component.literal(trigger.enemy_name));
-//                entity.setCustomNameVisible(true);
-//            }
-//
-//            // Finalize spawn (before moving)
-//            if (entity instanceof Mob mob) {
-//                mob.finalizeSpawn(level, level.getCurrentDifficultyAt(pos), MobSpawnType.EVENT, null, null);
-//            }
-//
-//            // Slight offset to avoid perfect overlap
-//            double offsetX = i * 0.4 * Math.cos(Math.toRadians(yaw));
-//            double offsetZ = i * 0.4 * Math.sin(Math.toRadians(yaw));
-//
-//            entity.moveTo(pos.getX() + 0.5 + offsetX, pos.getY(), pos.getZ() + 0.5 + offsetZ, yaw, 0.0f);
-//
-//            // Force full orientation
-//            entity.setYRot(yaw);
-//            entity.setYHeadRot(yaw);
-//            entity.setYBodyRot(yaw);
-//            if (entity instanceof Mob mob) {
-//                mob.setYRot(yaw);
-//                mob.setYHeadRot(yaw);
-//                mob.setYBodyRot(yaw);
-//                mob.yRotO = yaw;
-//                mob.yHeadRotO = yaw;
-//            }
-//
-//            level.addFreshEntity(entity);
-//
-//            if (firstEntity == null) {
-//                firstEntity = entity;
-//            }
-//
-//            // Optional debug message
-//            for (ServerPlayer p : level.players()) {
-//                if (p.gameMode.getGameModeForPlayer() == GameType.CREATIVE) {
-//                    p.sendSystemMessage(Component.literal("§7[Debug] §eSpawned enemy (" + trigger.enemy_name + ") at " +
-//                            entity.blockPosition().getX() + ", " + entity.blockPosition().getY() + ", " + entity.blockPosition().getZ() + " dir: " + yaw));
-//                }
-//            }
-//        }
-//
-//        return firstEntity;
-//    }
 
 
     public static LivingEntity spawnEnemy(ServerLevel level, StoryStage.Trigger trigger) {

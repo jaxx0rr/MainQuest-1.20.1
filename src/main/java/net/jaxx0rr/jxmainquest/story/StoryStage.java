@@ -45,5 +45,8 @@ public class StoryStage {
         public String stop_timer;
 
         public boolean boss = false;
+
+        public String remove_item;
+        public int remove_amount;
     }
 }
