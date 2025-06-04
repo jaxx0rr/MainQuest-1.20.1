@@ -8,7 +8,7 @@ Each quest stage has a `trigger` object, which determines when the player progre
 config\jxmainquest\stages.json
 ```
 
-![JX MainQuest](image.png)
+![JX MainQuest](demo.png)
 
 ---
 
@@ -296,4 +296,4 @@ Any trigger type can define rewards using:
   - 9 `anditemX`
   - 9 `oritemX` 
 
-![JX MainQuest](image2.png)
+![JX MainQuest](image.png)
