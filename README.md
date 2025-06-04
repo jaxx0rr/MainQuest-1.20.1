@@ -8,6 +8,10 @@ Each quest stage has a `trigger` object, which determines when the player progre
 config\jxmainquest\stages.json
 ```
 
+![JX MainQuest](image.jpg)
+
+![JX MainQuest](image2.jpg)
+
 ---
 
 ## Structure Overview
@@ -157,9 +161,31 @@ Supports optional name match, radius, direction, rewards, and weather/time.
 }
 ```
 
-The enemy is automatically spawned (unless `spawn_enemy: false` is added).  
-Rewards are dropped **from the entity**.  
-Kills from any cause (e.g., fire, projectile) count.
+boss example
+
+```json
+{
+"text": "Defeat the Lich",
+"trigger": {
+"type": "enemy",
+"enemy": "graveyard:lich",
+"enemy_name": "Lich",
+"x": 1170,
+"y": 64,
+"z": 4351,
+"enemy_radius": 15,
+"reward_xp": 40,
+"boss": true
+}
+},
+```
+
+- The enemy is automatically spawned (unless `spawn_enemy: false` is added).  
+- Rewards are dropped **from the entity**.  
+- Kills from any cause (e.g., fire, projectile) count.
+- If "boss":true is used multiple rewards are given.
+- For bossfights everyone who joins the fight will not trigger another mob spawn.
+- You can spawn multiple enemies using "enemy": "minecraft:zombie:3"
 
 ---
 
