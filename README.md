@@ -41,7 +41,7 @@ config\jxmainquest\stages.json
 
 ## Structure Overview
 
-A single stage JSON object looks like this:
+A single stage JSON object looks like this (just remember to put a comma after each stage):
 
 ```json
 {
@@ -52,7 +52,7 @@ A single stage JSON object looks like this:
     "set_weather": "clear",  // Optional (clear, rain, thunder)
     ...                      // Additional fields depending on type
   }
-}
+}, //<- put comma here
 ```
 
 ---
