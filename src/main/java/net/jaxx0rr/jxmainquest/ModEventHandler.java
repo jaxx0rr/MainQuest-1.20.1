@@ -7,6 +7,7 @@ import net.jaxx0rr.jxmainquest.story.StoryProgressProvider;
 import net.jaxx0rr.jxmainquest.story.StoryStage;
 import net.jaxx0rr.jxmainquest.util.EnemySpawnTracker;
 import net.jaxx0rr.jxmainquest.util.SpawnRetryTracker;
+import net.jaxx0rr.jxmainquest.util.TimerManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -114,42 +115,53 @@ public class ModEventHandler {
 
         StoryStage.Trigger trigger = stage.trigger;
 
-        if (trigger.set_time != null && player.level() instanceof ServerLevel serverLevel) {
-            long newTime = switch (trigger.set_time.toLowerCase()) {
-                case "day" -> 1000L;
-                case "noon" -> 6000L;
-                case "night" -> 13000L;
-                case "midnight" -> 18000L;
-                default -> -1L;
+        if (trigger.set_time != null) {
+            String timeCommand = switch (trigger.set_time.toLowerCase()) {
+                case "day" -> "time set day";
+                case "noon" -> "time set noon";
+                case "night" -> "time set night";
+                case "midnight" -> "time set midnight";
+                default -> null;
             };
 
-            if (newTime >= 0) {
-                long currentDay = serverLevel.getDayTime() / 24000;
-                serverLevel.setDayTime(currentDay * 24000 + newTime);
-                System.out.println("[jxmainquest] Set time to '" + trigger.set_time + "' (" + newTime + ") for stage " + stageIndex);
+            if (timeCommand != null) {
+                player.server.getCommands().performPrefixedCommand(
+                        player.createCommandSourceStack(),
+                        timeCommand
+                );
+                System.out.println("[jxmainquest] Ran command: " + timeCommand + " for player " + player.getName().getString());
             } else {
-                System.out.println("[jxmainquest] Invalid set_time: " + trigger.set_time);
+                System.out.println("[jxmainquest] Invalid set_time value: " + trigger.set_time);
             }
         }
 
-        if (trigger.set_weather != null && player.level() instanceof ServerLevel serverLevel) {
-            switch (trigger.set_weather.toLowerCase()) {
-                case "clear" -> {
-                    serverLevel.setWeatherParameters(6000, 0, false, false);
-                    System.out.println("[jxmainquest] Set weather to CLEAR for stage " + stageIndex);
-                }
-                case "rain" -> {
-                    serverLevel.setWeatherParameters(0, 6000, true, false);
-                    System.out.println("[jxmainquest] Set weather to RAIN for stage " + stageIndex);
-                }
-                case "thunder", "storm" -> {
-                    serverLevel.setWeatherParameters(0, 6000, true, true);
-                    System.out.println("[jxmainquest] Set weather to THUNDER for stage " + stageIndex);
-                }
-                default -> {
-                    System.out.println("[jxmainquest] Invalid weather string: " + trigger.set_weather);
-                }
+        if (trigger.set_weather != null) {
+            String weatherCommand = switch (trigger.set_weather.toLowerCase()) {
+                case "clear" -> "weather clear";
+                case "rain" -> "weather rain";
+                case "thunder", "storm" -> "weather thunder";
+                default -> null;
+            };
+
+            if (weatherCommand != null) {
+                player.server.getCommands().performPrefixedCommand(
+                        player.createCommandSourceStack(),
+                        weatherCommand
+                );
+                System.out.println("[jxmainquest] Ran command: " + weatherCommand + " for stage " + stageIndex);
+            } else {
+                System.out.println("[jxmainquest] Invalid weather string: " + trigger.set_weather);
             }
+        }
+
+
+        if (trigger.start_timer != null) {
+            TimerManager.startTimer(player, trigger.start_timer);
+            StoryNetwork.sendStartTimerPacket(player); // You'll need a packet
+        }
+        if (trigger.stop_timer != null) {
+            TimerManager.stopTimer(player, trigger.stop_timer);
+            StoryNetwork.sendStopTimerPacket(player); // You'll need this too
         }
 
         // ✅ Clear previous enemy tracking (for safety across stages)
@@ -204,7 +216,8 @@ public class ModEventHandler {
             if (player.level() instanceof ServerLevel serverLevel) {
                 LivingEntity spawnedMob = spawnEnemy(serverLevel, trigger);
                 if (spawnedMob instanceof Mob) {
-                    EnemySpawnTracker.associateMobWithPlayer(spawnedMob, player);
+                    //EnemySpawnTracker.associateMobWithPlayer(spawnedMob, player);
+                    EnemySpawnTracker.associateMobWithPlayer(spawnedMob, player, trigger.boss);
                     System.out.println("[jxmainquest] Spawned enemy '" + enemyName + "' at " + target + " for stage " + stageIndex);
                 } else {
                     System.out.println("[jxmainquest] [problem] Could not spawn enemy '" + enemyName + "' at " + target + " for stage " + stageIndex);
@@ -344,65 +357,86 @@ public class ModEventHandler {
         }
     }
 
-
+//
 //    public static LivingEntity spawnEnemy(ServerLevel level, StoryStage.Trigger trigger) {
-//        ResourceLocation id = ResourceLocation.tryParse(trigger.enemy);
+//        String[] parts = trigger.enemy.split(":");
+//        if (parts.length < 2) return null;
+//
+//        String idString = parts[0] + ":" + parts[1];
+//        int amount = 1;
+//        if (parts.length == 3) {
+//            try {
+//                amount = Integer.parseInt(parts[2]);
+//            } catch (NumberFormatException e) {
+//                System.err.println("[jxmainquest] Invalid enemy amount: " + parts[2]);
+//            }
+//        }
+//
+//        ResourceLocation id = ResourceLocation.tryParse(idString);
 //        if (id == null || !ForgeRegistries.ENTITY_TYPES.containsKey(id)) {
+//            System.err.println("[jxmainquest] Unknown enemy type: " + idString);
 //            return null;
 //        }
 //
 //        EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(id);
-//        if (type == null) {
-//            return null;
-//        }
-//
-//        LivingEntity entity = (LivingEntity) type.create(level);
-//        if (entity == null) {
-//            return null;
-//        }
+//        if (type == null) return null;
 //
 //        BlockPos pos = new BlockPos(trigger.x, trigger.y, trigger.z);
 //        float yaw = trigger.dir;
 //
-//        // Name the mob if needed
-//        if (trigger.enemy_name != null && !trigger.enemy_name.isEmpty()) {
-//            entity.setCustomName(Component.literal(trigger.enemy_name));
-//            entity.setCustomNameVisible(true);
-//        }
+//        LivingEntity firstEntity = null;
 //
-//        // Finalize spawn (before moving)
-//        if (entity instanceof Mob mob) {
-//            mob.finalizeSpawn(level, level.getCurrentDifficultyAt(pos), MobSpawnType.EVENT, null, null);
-//        }
+//        for (int i = 0; i < amount; i++) {
+//            LivingEntity entity = (LivingEntity) type.create(level);
+//            if (entity == null) continue;
 //
-//        // Move with rotation
-//        entity.moveTo(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, yaw, 0.0f);
+//            // Name the mob if needed
+//            if (trigger.enemy_name != null && !trigger.enemy_name.isEmpty()) {
+//                entity.setCustomName(Component.literal(trigger.enemy_name));
+//                entity.setCustomNameVisible(true);
+//            }
 //
-//        // Force full orientation
-//        entity.setYRot(yaw);
-//        entity.setYHeadRot(yaw);
-//        entity.setYBodyRot(yaw);
+//            // Finalize spawn (before moving)
+//            if (entity instanceof Mob mob) {
+//                mob.finalizeSpawn(level, level.getCurrentDifficultyAt(pos), MobSpawnType.EVENT, null, null);
+//            }
 //
-//        if (entity instanceof Mob mob) {
-//            mob.setYRot(yaw);
-//            mob.setYHeadRot(yaw);
-//            mob.setYBodyRot(yaw);
-//            mob.yRotO = yaw;
-//            mob.yHeadRotO = yaw;
-//        }
+//            // Slight offset to avoid perfect overlap
+//            double offsetX = i * 0.4 * Math.cos(Math.toRadians(yaw));
+//            double offsetZ = i * 0.4 * Math.sin(Math.toRadians(yaw));
 //
-//        level.addFreshEntity(entity);
+//            entity.moveTo(pos.getX() + 0.5 + offsetX, pos.getY(), pos.getZ() + 0.5 + offsetZ, yaw, 0.0f);
 //
-//        // Optional debug message
-//        for (ServerPlayer p : level.players()) {
-//            if (p.gameMode.getGameModeForPlayer() == GameType.CREATIVE) {
-//                p.sendSystemMessage(Component.literal("§7[Debug] §eSpawned enemy (" + trigger.enemy_name + ") at " +
-//                        pos.getX() + ", " + pos.getY() + ", " + pos.getZ() + " dir: " + yaw));
+//            // Force full orientation
+//            entity.setYRot(yaw);
+//            entity.setYHeadRot(yaw);
+//            entity.setYBodyRot(yaw);
+//            if (entity instanceof Mob mob) {
+//                mob.setYRot(yaw);
+//                mob.setYHeadRot(yaw);
+//                mob.setYBodyRot(yaw);
+//                mob.yRotO = yaw;
+//                mob.yHeadRotO = yaw;
+//            }
+//
+//            level.addFreshEntity(entity);
+//
+//            if (firstEntity == null) {
+//                firstEntity = entity;
+//            }
+//
+//            // Optional debug message
+//            for (ServerPlayer p : level.players()) {
+//                if (p.gameMode.getGameModeForPlayer() == GameType.CREATIVE) {
+//                    p.sendSystemMessage(Component.literal("§7[Debug] §eSpawned enemy (" + trigger.enemy_name + ") at " +
+//                            entity.blockPosition().getX() + ", " + entity.blockPosition().getY() + ", " + entity.blockPosition().getZ() + " dir: " + yaw));
+//                }
 //            }
 //        }
 //
-//        return entity;
+//        return firstEntity;
 //    }
+
 
     public static LivingEntity spawnEnemy(ServerLevel level, StoryStage.Trigger trigger) {
         String[] parts = trigger.enemy.split(":");
@@ -430,30 +464,47 @@ public class ModEventHandler {
         BlockPos pos = new BlockPos(trigger.x, trigger.y, trigger.z);
         float yaw = trigger.dir;
 
+        // ✅ Check for existing "boss" mob
+        if (trigger != null && trigger.boss) {
+            double radius = trigger.enemy_radius > 0 ? trigger.enemy_radius : 12.0;
+
+            LivingEntity existing = level.getEntitiesOfClass(LivingEntity.class,
+                            new net.minecraft.world.phys.AABB(
+                                    pos.getX() - radius, pos.getY() - 4, pos.getZ() - radius,
+                                    pos.getX() + radius, pos.getY() + 4, pos.getZ() + radius))
+                    .stream()
+                    .filter(e -> e.isAlive()
+                            && ForgeRegistries.ENTITY_TYPES.getKey(e.getType()).equals(id)
+                            && (trigger.enemy_name == null || trigger.enemy_name.equals(e.getName().getString())))
+                    .findFirst()
+                    .orElse(null);
+
+            if (existing != null) {
+                System.out.println("[jxmainquest] Skipping boss spawn — existing instance found nearby");
+                return existing;
+            }
+        }
+
         LivingEntity firstEntity = null;
 
         for (int i = 0; i < amount; i++) {
             LivingEntity entity = (LivingEntity) type.create(level);
             if (entity == null) continue;
 
-            // Name the mob if needed
             if (trigger.enemy_name != null && !trigger.enemy_name.isEmpty()) {
                 entity.setCustomName(Component.literal(trigger.enemy_name));
                 entity.setCustomNameVisible(true);
             }
 
-            // Finalize spawn (before moving)
             if (entity instanceof Mob mob) {
                 mob.finalizeSpawn(level, level.getCurrentDifficultyAt(pos), MobSpawnType.EVENT, null, null);
             }
 
-            // Slight offset to avoid perfect overlap
             double offsetX = i * 0.4 * Math.cos(Math.toRadians(yaw));
             double offsetZ = i * 0.4 * Math.sin(Math.toRadians(yaw));
 
             entity.moveTo(pos.getX() + 0.5 + offsetX, pos.getY(), pos.getZ() + 0.5 + offsetZ, yaw, 0.0f);
 
-            // Force full orientation
             entity.setYRot(yaw);
             entity.setYHeadRot(yaw);
             entity.setYBodyRot(yaw);
@@ -471,7 +522,6 @@ public class ModEventHandler {
                 firstEntity = entity;
             }
 
-            // Optional debug message
             for (ServerPlayer p : level.players()) {
                 if (p.gameMode.getGameModeForPlayer() == GameType.CREATIVE) {
                     p.sendSystemMessage(Component.literal("§7[Debug] §eSpawned enemy (" + trigger.enemy_name + ") at " +

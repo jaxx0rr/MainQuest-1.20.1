@@ -40,5 +40,10 @@ public class StoryStage {
 
         public String set_time;
         public String set_weather; // "clear", "rain", "thunder"
+
+        public String start_timer;
+        public String stop_timer;
+
+        public boolean boss = false;
     }
 }

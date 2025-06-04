@@ -1,7 +1,8 @@
 package net.jaxx0rr.jxmainquest.client;
 
-import net.jaxx0rr.jxmainquest.story.StoryStage;
 import net.jaxx0rr.jxmainquest.config.StoryStageLoader;
+import net.jaxx0rr.jxmainquest.story.StoryStage;
+import net.jaxx0rr.jxmainquest.util.ClientTimerManager;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -113,6 +114,21 @@ public class HudOverlay {
 
         // Text
         guiGraphics.drawString(font, text, sx + padding, sy + padding, 0x000000, false);
+
+        if (ClientTimerManager.isRunning()) {
+            String timerText = ClientTimerManager.getFormattedTime();
+            int centerX = mc.getWindow().getGuiScaledWidth() / 2;
+            int ty = 30;
+            int color = 0xFFFF00; // Yellow
+            float tscale = 2.0f;
+
+            guiGraphics.pose().pushPose();
+            guiGraphics.pose().scale(tscale, tscale, 1.0f);
+            int scaledX = (int) (centerX / tscale - font.width(timerText) / 2);
+            int scaledY = (int) (ty / tscale);
+            guiGraphics.drawString(font, timerText, scaledX, scaledY, color, true);
+            guiGraphics.pose().popPose();
+        }
 
         guiGraphics.pose().popPose();
 

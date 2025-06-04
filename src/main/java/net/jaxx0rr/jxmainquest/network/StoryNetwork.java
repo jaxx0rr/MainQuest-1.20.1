@@ -35,8 +35,19 @@ public class StoryNetwork {
         CHANNEL.registerMessage(id++, OpenDialoguePacket.class, OpenDialoguePacket::encode, OpenDialoguePacket::decode, OpenDialoguePacket::handle);
         CHANNEL.registerMessage(id++, InteractionCompletePacket.class, InteractionCompletePacket::encode, InteractionCompletePacket::decode, InteractionCompletePacket::handle);
         CHANNEL.registerMessage(id++, StageListSyncPacket.class, StageListSyncPacket::encode, StageListSyncPacket::decode, StageListSyncPacket::handle);
+
+        CHANNEL.registerMessage(id++, StartTimerClientPacket.class, StartTimerClientPacket::encode, StartTimerClientPacket::decode, StartTimerClientPacket::handle);
+        CHANNEL.registerMessage(id++, StopTimerClientPacket.class, StopTimerClientPacket::encode, StopTimerClientPacket::decode, StopTimerClientPacket::handle);
+
     }
 
+    public static void sendStartTimerPacket(ServerPlayer player) {
+        CHANNEL.sendTo(new StartTimerClientPacket(), player.connection.connection, NetworkDirection.PLAY_TO_CLIENT);
+    }
+
+    public static void sendStopTimerPacket(ServerPlayer player) {
+        CHANNEL.sendTo(new StopTimerClientPacket(), player.connection.connection, NetworkDirection.PLAY_TO_CLIENT);
+    }
 
     public static void sendStageToClient(ServerPlayer player, int stage) {
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new StageSyncPacket(stage));

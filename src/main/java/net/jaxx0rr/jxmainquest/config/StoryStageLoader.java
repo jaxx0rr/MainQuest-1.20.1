@@ -4,8 +4,6 @@ import com.google.gson.Gson;
 import net.jaxx0rr.jxmainquest.story.StoryStage;
 import net.minecraftforge.fml.loading.FMLPaths;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -46,34 +44,19 @@ public class StoryStageLoader {
             }
 
             stages = Arrays.asList(loaded);
-            System.out.println("[jxmainquest] ✅ Loaded " + stages.size() + " story stages.");
+            System.out.println("[jxmainquest] Loaded " + stages.size() + " story stages.");
         } catch (Exception e) {
-            System.err.println("[jxmainquest] ❌ Failed to load story json — exception thrown.");
+            System.err.println("[jxmainquest] Failed to load story json — exception thrown.");
             e.printStackTrace();
             stages = new ArrayList<>();
         }
     }
-
 
     public static int reloadStages() {
         loadStages();
         return stages.size();
     }
 
-    private static void copyDefaultStagesTo(Path destination) {
-        try (InputStream in = StoryStageLoader.class.getResourceAsStream("/assets/jxmainquest/default_stages.json")) {
-            if (in == null) {
-                System.err.println("[jxmainquest] Default stages.json not found in assets!");
-                return;
-            }
-
-            Files.createDirectories(destination.getParent());
-            Files.copy(in, destination);
-            System.out.println("[jxmainquest] Default stages.json copied to config.");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
 }
 
 
