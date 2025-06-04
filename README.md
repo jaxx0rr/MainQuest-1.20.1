@@ -1,5 +1,13 @@
 # JX MainQuest Mod - Trigger & Stage System Documentation
 
+![JX MainQuest](image.png)
+
+This mod lets you create a main quest system without having to use command blocks and forget where you put them..
+
+![JX MainQuest](demo.png)
+
+# Documentation
+
 This guide provides detailed documentation and examples for using the `jxmainquest` mod's stage/trigger system.  
 Each quest stage has a `trigger` object, which determines when the player progresses to the next stage.
 
@@ -7,8 +15,6 @@ Each quest stage has a `trigger` object, which determines when the player progre
 ```
 config\jxmainquest\stages.json
 ```
-
-![JX MainQuest](demo.png)
 
 ---
 
@@ -296,4 +302,3 @@ Any trigger type can define rewards using:
   - 9 `anditemX`
   - 9 `oritemX` 
 
-![JX MainQuest](image.png)
