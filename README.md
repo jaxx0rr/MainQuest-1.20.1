@@ -8,9 +8,7 @@ Each quest stage has a `trigger` object, which determines when the player progre
 config\jxmainquest\stages.json
 ```
 
-![JX MainQuest](image.jpg)
-
-![JX MainQuest](image2.jpg)
+![JX MainQuest](image.png)
 
 ---
 
@@ -280,3 +278,5 @@ Any trigger type can define rewards using:
   - 9 `oritemX`
 - Add `"spawn_enemy": false` to prevent auto enemy spawning
 - Dialogue is optional for `interaction` stages  
+
+![JX MainQuest](image2.png)
