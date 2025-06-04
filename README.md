@@ -374,4 +374,17 @@ where you can define a default spawn dimention and location for new players like
 }
 ```
 
+#### 🔒 Conditional Item Requirement (for `interaction` triggers)
+
+You can require the player to possess a specific item before progressing:
+
+```json
+"remove_item": "minecraft:golden_horse_armor",
+"remove_amount": 1
+```
+
+If the player doesn't have enough of the item, the interaction is blocked and a warning is shown. When the stage progresses, the item is removed from their inventory.
+
+
+
 for suggestions feel free to contact me on my discord (username: jaxx0rr)
