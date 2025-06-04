@@ -1,8 +1,29 @@
 # JX MainQuest Mod - Trigger & Stage System
 
+
 ![JX MainQuest](image.png)
 
-This mod lets you create a main quest system without having to use command blocks and forget where you put them..
+
+JX MainQuest is a lightweight quest system mod designed for Minecraft map makers and adventure modders. It allows you to define a structured main questline using a simple JSON file — no need for messy command blocks or complicated redstone logic.
+
+With JX MainQuest, you can:
+
+Define quest stages based on player location, item pickup, NPC interaction, or enemy defeat
+
+Customize NPCs with dialogue trees, professions, and waypoints
+
+Spawn enemies on demand, including optional boss logic with shared progress
+
+Set rewards, change time of day, or control weather per quest stage
+
+Track progress per player and show objectives on the HUD
+
+Use an in-game command to reload quests on the fly during testing
+
+Whether you're building a Hogwarts adventure or a custom RPG story, this mod keeps your quest logic clean, externalized, and easy to manage — right from your config folder.
+
+No more digging through redstone mazes — just focus on the story.
+
 
 ![JX MainQuest](demo.png)
 
