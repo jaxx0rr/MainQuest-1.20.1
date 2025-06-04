@@ -1,4 +1,4 @@
-# JX MainQuest Mod - Trigger & Stage System Documentation
+# JX MainQuest Mod - Trigger & Stage System
 
 ![JX MainQuest](image.png)
 
