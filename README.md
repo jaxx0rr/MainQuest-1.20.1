@@ -61,15 +61,39 @@ Supports extra required and/or alternate items:
   "text": "Collect your wand materials",
   "trigger": {
     "type": "item",
-    "item": "minecraft:stick:1",
-    "anditem1": "minecraft:feather:1",
-    "anditem2": "minecraft:diamond:1",
-    "oritem1": "hexerei:blood_sigil"
+    "item": "minecraft:stick"
   }
 }
 ```
 
+Player needs 3 stone and 3 feathers
+
+```json
+{
+  "text": "Example 2",
+  "trigger": {
+    "type": "item",
+    "item": "minecraft:stone:3",
+    "anditem1": "minecraft:feather:3"
+  }
+}
+```
+
+Player needs either a stone or a feather
+
+```json
+{
+  "text": "Example 3",
+  "trigger": {
+    "type": "item",
+    "item": "minecraft:stone",
+    "oritem1": "minecraft:feather"
+  }
+}
+```
+[required]
 * `item` = base item (with optional amount)
+[optional]
 * `anditemX` = all required
 * `oritemX` = at least one required
 
@@ -88,8 +112,7 @@ A combination of location and item — the player must be at the specified locat
     "y": 63,
     "z": -100,
     "radius": 4,
-    "item": "hexerei:willow_log:2",
-    "anditem1": "minecraft:feather:3"
+    "item": "hexerei:willow_log:2"
   }
 }
 ```
@@ -132,7 +155,7 @@ Can include dialogue and auto-spawns the NPC.
 
 NPC will automatically spawn at the location and despawn/reset when needed.  
 Progression happens after the final dialogue line.
-
+Player choice progress is made by simply pressing the suggested key (1,2,3) (do not type it in chat .. just press it)
 ---
 
 ### 5. `enemy`
@@ -159,7 +182,7 @@ Supports optional name match, radius, direction, rewards, and weather/time.
 }
 ```
 
-boss example
+enemy BOSS
 
 ```json
 {
@@ -189,7 +212,7 @@ boss example
 
 ### 6. `waypoint`
 
-Identical to `location`, but silent and invisible.
+Identical to `location`, but does not trigger a quest completion every time.
 
 ```json
 {
@@ -206,9 +229,6 @@ Identical to `location`, but silent and invisible.
 }
 ```
 
-- No stage title shown
-- No HUD text displayed
-- No log or "quest complete" message
 - Used for passive progress points
 
 ---
@@ -233,7 +253,7 @@ These work on any trigger type:
 
 ---
 
-## Commands
+## Debug Commands
 
 All developer/testing commands use `/jxmq`.
 
@@ -256,7 +276,7 @@ Any trigger type can define rewards using:
 
 ```json
 "reward_item": "minecraft:emerald",
-"reward_amount": 2,
+"reward_amount": 1,
 "reward_xp": 10
 ```
 
@@ -267,7 +287,6 @@ Any trigger type can define rewards using:
 - For `enemy` triggers, rewards **drop from the killed mob**
 - For all other triggers (`item`, `location`, `interaction`, etc.), rewards are **given directly to the player**
 
-
 ---
 
 ## Notes
@@ -275,8 +294,6 @@ Any trigger type can define rewards using:
 - `item`, `anditemX`, `oritemX` support `:amount` suffixes
 - Up to:
   - 9 `anditemX`
-  - 9 `oritemX`
-- Add `"spawn_enemy": false` to prevent auto enemy spawning
-- Dialogue is optional for `interaction` stages  
+  - 9 `oritemX` 
 
 ![JX MainQuest](image2.png)
