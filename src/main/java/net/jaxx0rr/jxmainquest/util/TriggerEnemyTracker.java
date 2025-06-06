@@ -51,39 +51,6 @@ public class TriggerEnemyTracker {
     }
 
 
-//    public static boolean checkEnemyTriggerForPlayer(ServerLevel level, ServerPlayer player, net.jaxx0rr.jxmainquest.story.StoryProgress progress) {
-//        int stageIndex = progress.getCurrentStage();
-//        if (stageIndex >= StoryStageLoader.stages.size()) return false;
-//
-//        StoryStage stage = StoryStageLoader.stages.get(stageIndex);
-//        StoryStage.Trigger trigger = stage.trigger;
-//
-//        if (!"enemy".equals(trigger.type)) return false;
-//        if (trigger.enemy == null || trigger.enemy.isEmpty()) return false;
-//
-//        ResourceLocation id = getEnemyType(trigger.enemy);
-//        if (id == null || !ForgeRegistries.ENTITY_TYPES.containsKey(id)) return false;
-//
-//        EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(id);
-//        if (type == null) return false;
-//
-//        BlockPos center = new BlockPos(trigger.x, trigger.y, trigger.z);
-//        if (!player.blockPosition().closerThan(center, trigger.enemy_radius)) return false;
-//
-//        int radius = 100;
-//
-//        List<LivingEntity> mobs = level.getEntities(EntityTypeTest.forClass(LivingEntity.class),
-//                new net.minecraft.world.phys.AABB(
-//                        center.offset(-radius, -radius, -radius),
-//                        center.offset(radius, radius, radius)
-//                ),
-//                e -> e.getType().equals(type) &&
-//                        (trigger.enemy_name == null || trigger.enemy_name.equals(e.getName().getString()))
-//        );
-//
-//        return mobs.isEmpty();
-//    }
-
     public static boolean checkEnemyTriggerForPlayer(ServerLevel level, ServerPlayer player, StoryProgress progress) {
         int stageIndex = progress.getCurrentStage();
         if (stageIndex >= StoryStageLoader.stages.size()) {
