@@ -215,9 +215,13 @@ public class ModEventHandler {
 
             if (player.level() instanceof ServerLevel serverLevel) {
                 LivingEntity spawnedMob = spawnEnemy(serverLevel, trigger);
-                if (spawnedMob instanceof Mob) {
-                    //EnemySpawnTracker.associateMobWithPlayer(spawnedMob, player);
+                if (spawnedMob instanceof Mob mob) {
                     EnemySpawnTracker.associateMobWithPlayer(spawnedMob, player, trigger.boss);
+
+                    mob.setTarget(player); // Make the mob aggro on the player
+                    mob.setLastHurtByMob(player); // Make it remember the player
+                    mob.setPersistenceRequired(); // Prevent despawn
+
                     System.out.println("[jxmainquest] Spawned enemy '" + enemyName + "' at " + target + " for stage " + stageIndex);
                 } else {
                     System.out.println("[jxmainquest] [problem] Could not spawn enemy '" + enemyName + "' at " + target + " for stage " + stageIndex);
